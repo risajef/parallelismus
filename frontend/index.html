@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Parallelismus Demo</title>
+    <style>
+      body { font-family: sans-serif; padding: 1rem }
+      select, button { margin: .5rem 0 }
+      .words { margin-top: 1rem }
+    </style>
+  </head>
+  <body>
+    <h1>Parallelismus</h1>
+    <div>
+      <label>Book</label>
+      <select id="books"></select>
+    </div>
+    <div>
+      <label>Chapter</label>
+      <select id="chapters"></select>
+    </div>
+    <div>
+      <label>Verse</label>
+      <select id="verses"></select>
+    </div>
+
+    <div class="words">
+      <h3>Words</h3>
+      <ul id="words"></ul>
+    </div>
+
+    <div style="margin-top:1rem">
+      <h3>Add relation</h3>
+      <div>
+        <input id="src" placeholder="source word id" />
+        <input id="tgt" placeholder="target word id" />
+        <input id="type" placeholder="relation type (similar/opposite/subcategory/compose)" />
+        <button id="addRel">Add</button>
+      </div>
+      <pre id="result"></pre>
+    </div>
+
+    <script type="module">
+      import * as api from './static/app.js';
+
+      const booksEl = document.getElementById('books');
+      const chaptersEl = document.getElementById('chapters');
+      const versesEl = document.getElementById('verses');
+      const wordsEl = document.getElementById('words');
+      const resultEl = document.getElementById('result');
+
+      async function loadBooks(){
+        const books = await api.fetchBooks();
+        console.log('books', books);
+        booksEl.innerHTML = '';
+        books.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id; opt.textContent = b.name;
+          booksEl.appendChild(opt);
+        });
+        if(books[0]) loadChapters(books[0].id);
+      }
+
+      async function loadChapters(bookId){
+        const chapters = await api.fetchChapters(bookId);
+        chaptersEl.innerHTML = '';
+        chapters.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id; opt.textContent = c.number;
+          chaptersEl.appendChild(opt);
+        });
+        if(chapters[0]) loadVerses(chapters[0].id);
+      }
+
+      async function loadVerses(chapterId){
+        const verses = await api.fetchVerses(chapterId);
+        versesEl.innerHTML = '';
+        verses.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v.id; opt.textContent = v.number;
+          versesEl.appendChild(opt);
+        });
+        if(verses[0]) loadWords(verses[0].id);
+      }
+
+      async function loadWords(verseId){
+        const words = await api.fetchWords(verseId);
+        wordsEl.innerHTML = '';
+        words.forEach(w => {
+          const li = document.createElement('li');
+          li.textContent = `${w.id} — ${w.strong} — ${w.translation || ''} — ${w.original || ''}`;
+          wordsEl.appendChild(li);
+        });
+      }
+
+      booksEl.addEventListener('change', ()=> loadChapters(Number(booksEl.value)) );
+      chaptersEl.addEventListener('change', ()=> loadVerses(Number(chaptersEl.value)) );
+      versesEl.addEventListener('change', ()=> loadWords(Number(versesEl.value)) );
+
+      document.getElementById('addRel').addEventListener('click', async ()=>{
+        const srcEl = document.getElementById('src');
+        const tgtEl = document.getElementById('tgt');
+        const typeEl = document.getElementById('type');
+        const src = Number(srcEl && srcEl.value ? srcEl.value : 0);
+        const tgt = Number(tgtEl && tgtEl.value ? tgtEl.value : 0);
+        const type = typeEl && typeEl.value ? typeEl.value : '';
+        const payload = { source_id: src, target_id: tgt, relation_type: type };
+        const res = await api.addRelation(payload);
+        resultEl.textContent = JSON.stringify(res, null, 2);
+      });
+
+      loadBooks();
+    </script>
+  </body>
+</html>
