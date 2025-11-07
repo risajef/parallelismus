@@ -5,10 +5,15 @@ from sqlalchemy.types import JSON
 
 
 class VerseWord(SQLModel, table=True):
-    """Association table linking Verse and Word for many-to-many relationship."""
+    """Association table linking Verse and Word for many-to-many relationship.
+    Stores the canonical original and translation from the bible JSON for this specific verse context.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
     verse_id: int = Field(foreign_key="verse.id")
     word_id: str = Field(foreign_key="word.strong")
+    # canonical original and translation for this word in this verse (from the bible JSON)
+    original: str = Field(default="")
+    translation: str = Field(default="")
 
 
 class Book(SQLModel, table=True):

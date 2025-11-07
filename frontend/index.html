@@ -7,6 +7,16 @@
       body { font-family: sans-serif; padding: 1rem }
       select, button { margin: .5rem 0 }
       .words { margin-top: 1rem }
+  .word-main { cursor: help; }
+  .word-meta { color: #666; font-size: 0.9em; margin-left: .5rem }
+  /* horizontal word chips */
+  #words { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; padding: 0; margin: 0 }
+  #words li { list-style: none }
+  .word-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: .4rem .6rem; border-radius: 6px; background: #fafafa; border: 1px solid #eee; min-width: 4ch; text-align: center }
+  .word-english { font-weight: 600; font-size: 1rem; color: #111 }
+  .word-original { font-family: serif; font-size: .95rem; color: #333; margin-top: .15rem }
+      /* tooltip */
+      #word-tooltip { position: absolute; background: #fff; border: 1px solid #ccc; padding: .5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.12); display: none; z-index: 1000; max-width: 40rem; white-space: pre-wrap }
     </style>
   </head>
   <body>
@@ -61,6 +71,20 @@
         if(books[0]) loadChapters(books[0].id);
       }
 
+      // simple HTML escape to prevent injection in tooltip content
+      function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/[&<>"]+/g, function(s) {
+          switch (s) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            default: return '';
+          }
+        });
+      }
+
       async function loadChapters(bookId){
         const chapters = await api.fetchChapters(bookId);
         chaptersEl.innerHTML = '';
@@ -83,15 +107,135 @@
         if(verses[0]) loadWords(verses[0].id);
       }
 
+      // Render words: show canonical original and translation from the verse context (verse_original, verse_translation)
+      // and expose all originals/translations (all_originals, all_translations) on hover via the native title tooltip.
       async function loadWords(verseId){
         const words = await api.fetchWords(verseId);
         wordsEl.innerHTML = '';
         words.forEach(w => {
           const li = document.createElement('li');
-          li.textContent = `${w.id} — ${w.strong} — ${w.translation || ''} — ${w.original || ''}`;
-          wordsEl.appendChild(li);
+
+            const canonicalOriginal = w.verse_original || '';
+            const canonicalTranslation = w.verse_translation || '';
+
+            // create a chip-like box with english on top and original below
+            const box = document.createElement('div');
+            box.className = 'word-box word-main';
+            box.tabIndex = 0; // focusable for keyboard
+
+            const top = document.createElement('div');
+            top.className = 'word-english';
+            top.textContent = canonicalTranslation || '';
+
+            const bottom = document.createElement('div');
+            bottom.className = 'word-original';
+            bottom.textContent = canonicalOriginal || (canonicalTranslation ? '' : w.strong || '(no text)');
+
+            // prepare full lists for custom tooltip
+            const allOriginals = Array.isArray(w.all_originals) ? w.all_originals : [];
+            const allTranslations = Array.isArray(w.all_translations) ? w.all_translations : [];
+            box.dataset.allOriginals = JSON.stringify(allOriginals);
+            box.dataset.allTranslations = JSON.stringify(allTranslations);
+
+            box.appendChild(top);
+            box.appendChild(bottom);
+            li.appendChild(box);
+            wordsEl.appendChild(li);
         });
       }
+
+      // Custom tooltip element (single shared element)
+      const tooltip = document.createElement('div');
+      tooltip.id = 'word-tooltip';
+      // make tooltip non-interactive so it doesn't steal mouse events
+      tooltip.style.pointerEvents = 'none';
+      document.body.appendChild(tooltip);
+
+      /* tooltip layout styles: use a two-column grid for translations (left) and originals (right) */
+      const tooltipStyle = document.createElement('style');
+      tooltipStyle.textContent = `
+        #word-tooltip .tooltip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        #word-tooltip .tooltip-col { padding: 0; margin: 0 }
+        #word-tooltip .tooltip-col h4 { margin: 0 0 .25rem 0; font-size: .95em }
+        #word-tooltip .tooltip-col ul { margin: 0; padding-left: 1rem }
+      `;
+      document.head.appendChild(tooltipStyle);
+
+      // Helper to position tooltip near the mouse and keep it on-screen
+      function positionTooltip(x, y) {
+        const pad = 8;
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        const rect = tooltip.getBoundingClientRect();
+        let left = x + pad;
+        let top = y - rect.height / 2;
+        // if overflowing right, place to the left of cursor
+        if (left + rect.width + pad > winW) left = x - rect.width - pad;
+        // if overflowing top/bottom, clamp
+        if (top < pad) top = pad;
+        if (top + rect.height + pad > winH) top = winH - rect.height - pad;
+        tooltip.style.left = (window.scrollX + left) + 'px';
+        tooltip.style.top = (window.scrollY + top) + 'px';
+      }
+
+      // Show/hide tooltip on mouseover/mouseout; follow mouse using mousemove
+      let activeTarget = null;
+      function handleMouseOver(ev) {
+        const target = ev.target;
+        if (target && target.classList && target.classList.contains('word-main')) {
+          activeTarget = target;
+          // build a two-column HTML representation
+          let originals = [];
+          let translations = [];
+          try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch(e) {}
+          try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
+          const leftList = translations.length ? '<ul>' + translations.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>' : '<div>-</div>';
+          const rightList = originals.length ? '<ul>' + originals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
+          tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
+          tooltip.style.display = 'block';
+          // position immediately and then follow mouse
+          positionTooltip(ev.clientX, ev.clientY);
+          document.addEventListener('mousemove', handleMouseMove);
+        }
+      }
+      function handleMouseOut(ev) {
+        const target = ev.target;
+        if (target && target.classList && target.classList.contains('word-main')) {
+          activeTarget = null;
+          tooltip.style.display = 'none';
+          document.removeEventListener('mousemove', handleMouseMove);
+        }
+      }
+      function handleMouseMove(ev) {
+        if (!activeTarget) return;
+        positionTooltip(ev.clientX, ev.clientY);
+      }
+
+      document.body.addEventListener('mouseover', handleMouseOver);
+      document.body.addEventListener('mouseout', handleMouseOut);
+
+      // also support keyboard focus for accessibility (show tooltip on focus)
+      document.body.addEventListener('focusin', (ev) => {
+        const target = ev.target;
+        if (target && target.classList && target.classList.contains('word-main')) {
+          let originals = [];
+          let translations = [];
+          try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch(e) {}
+          try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
+          const leftList = translations.length ? '<ul>' + translations.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>' : '<div>-</div>';
+          const rightList = originals.length ? '<ul>' + originals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
+          tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
+          tooltip.style.display = 'block';
+          const rect = target.getBoundingClientRect();
+          positionTooltip(rect.right + 8, rect.top + rect.height / 2);
+        }
+      });
+      document.body.addEventListener('focusout', (ev) => {
+        const target = ev.target;
+        if (target && target.classList && target.classList.contains('word-main')) {
+          tooltip.style.display = 'none';
+        }
+      });
 
       booksEl.addEventListener('change', ()=> loadChapters(Number(booksEl.value)) );
       chaptersEl.addEventListener('change', ()=> loadVerses(Number(chaptersEl.value)) );

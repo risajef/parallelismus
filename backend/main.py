@@ -4,9 +4,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlmodel import select
 from typing import List
+from pydantic import BaseModel
 
 from .database import create_db_and_tables, get_session, engine
 from .models import Book, Chapter, Verse, Word, Relation, VerseWord
+
+
+class WordInVerse(BaseModel):
+    """Word with verse-specific original and translation from VerseWord association."""
+    strong: str
+    # verse-specific canonical original and translation (from VerseWord)
+    verse_original: str
+    verse_translation: str
+    # all variants (from Word.original and Word.translation lists)
+    all_originals: list[str]
+    all_translations: list[str]
+
 
 app = FastAPI(title="Parallelismus API")
 
@@ -56,14 +69,24 @@ def list_verses(chapter_id: int):
         return session.exec(select(Verse).where(Verse.chapter_id == chapter_id)).all()
 
 
-@app.get("/verses/{verse_id}/words", response_model=List[Word])
+@app.get("/verses/{verse_id}/words", response_model=List[WordInVerse])
 def list_words(verse_id: int):
     from sqlmodel import Session
     from sqlmodel import select as _select
     with Session(engine) as session:
-        # select Words that are linked to the verse via VerseWord
-        stmt = _select(Word).join(VerseWord, Word.strong == VerseWord.word_id).where(VerseWord.verse_id == verse_id)
-        return session.exec(stmt).all()
+        # join Word and VerseWord to get both the global word data and verse-specific original/translation
+        stmt = _select(Word, VerseWord).join(VerseWord, Word.strong == VerseWord.word_id).where(VerseWord.verse_id == verse_id)
+        results = session.exec(stmt).all()
+        return [
+            WordInVerse(
+                strong=word.strong,
+                verse_original=vw.original,
+                verse_translation=vw.translation,
+                all_originals=word.original,
+                all_translations=word.translation
+            )
+            for word, vw in results
+        ]
 
 
 @app.get("/words/{word_id}/relations", response_model=List[Relation])

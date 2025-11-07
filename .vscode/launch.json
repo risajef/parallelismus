@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Debug fill_words",
+      "type": "python",
+      "request": "launch",
+      "module": "backend.fill_words",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Python: Debug import_strong",
+      "type": "python",
+      "request": "launch",
+      "module": "backend.import_strong",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    }
+    ,
+    {
+      "name": "Uvicorn: backend.main",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/uvicorn",
+      "args": ["backend.main:app", "--reload", "--port", "8000"],
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "justMyCode": true
+    }
+  ]
+}

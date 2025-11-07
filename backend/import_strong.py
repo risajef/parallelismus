@@ -107,9 +107,15 @@ def import_all():
                             session.flush()
 
                         # ensure VerseWord association exists linking this verse and the (global) word
+                        # store the canonical original and translation for this verse context
                         link = session.exec(select(VerseWord).where(VerseWord.verse_id == v.id, VerseWord.word_id == strong)).first()
                         if not link:
-                            link = VerseWord(verse_id=v.id, word_id=strong)
+                            link = VerseWord(
+                                verse_id=v.id,
+                                word_id=strong,
+                                original=original or "",
+                                translation=translation or ""
+                            )
                             session.add(link)
                             session.flush()
 
