@@ -21,6 +21,13 @@ class WordInVerse(BaseModel):
     all_translations: list[str]
 
 
+class RelationGroup(BaseModel):
+    source_id: str
+    target_id: str
+    relation_type: str
+    source_verse_ids: list[int]
+
+
 app = FastAPI(title="Parallelismus API")
 
 # serve the frontend static files from the frontend/ directory at /static
@@ -96,6 +103,61 @@ def get_relations(word_id: str):
         return session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
 
 
+@app.get("/relation_types", response_model=List[str])
+def list_relation_types():
+    from sqlmodel import Session
+    from sqlmodel import select as _select
+    with Session(engine) as session:
+        rows = session.exec(_select(Relation.relation_type).distinct()).all()
+        # rows will be a list of strings
+        return rows
+
+
+@app.get("/verse/{verse_id}", response_model=Verse)
+def get_verse(verse_id: int):
+    from sqlmodel import Session
+    with Session(engine) as session:
+        verse = session.get(Verse, verse_id)
+        if not verse:
+            raise HTTPException(status_code=404, detail="Verse not found")
+        return verse
+
+
+@app.get("/strong/{strong}", include_in_schema=False)
+def strong_page(strong: str):
+    # serves a small frontend page that shows information about a strong and its relations
+    return FileResponse("frontend/strong.html")
+
+
+@app.get("/chapter/{chapter_id}", response_model=Chapter)
+def get_chapter(chapter_id: int):
+    from sqlmodel import Session
+    with Session(engine) as session:
+        chap = session.get(Chapter, chapter_id)
+        if not chap:
+            raise HTTPException(status_code=404, detail="Chapter not found")
+        return chap
+
+
+@app.get("/relations/grouped/{word_id}", response_model=List[RelationGroup])
+def get_grouped_relations(word_id: str):
+    """Return relations involving word_id, grouped by (source,target,type) with all source_verse_ids."""
+    from sqlmodel import Session
+    with Session(engine) as session:
+        rows = session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
+        groups: dict[tuple[str, str, str], set[int]] = {}
+        for r in rows:
+            key = (r.source_id, r.target_id, r.relation_type)
+            groups.setdefault(key, set())
+            if r.source_verse_id is not None:
+                groups[key].add(r.source_verse_id)
+
+        result: list[RelationGroup] = []
+        for (s, t, typ), verses in groups.items():
+            result.append(RelationGroup(source_id=s, target_id=t, relation_type=typ, source_verse_ids=sorted(list(verses))))
+        return result
+
+
 @app.post("/relations", response_model=Relation)
 def add_relation(relation: Relation):
     from sqlmodel import Session
@@ -104,3 +166,18 @@ def add_relation(relation: Relation):
         session.commit()
         session.refresh(relation)
         return relation
+
+
+@app.delete("/relations/{relation_id}", response_model=Relation)
+def delete_relation(relation_id: int):
+    """Delete a relation by id and return the deleted relation."""
+    from sqlmodel import Session
+    with Session(engine) as session:
+        rel = session.get(Relation, relation_id)
+        if not rel:
+            raise HTTPException(status_code=404, detail="Relation not found")
+        # store a copy to return after deletion
+        out = Relation.from_orm(rel)
+        session.delete(rel)
+        session.commit()
+        return out

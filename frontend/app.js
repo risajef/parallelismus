@@ -37,3 +37,36 @@ export async function addRelation(payload) {
     });
     return res.json();
 }
+
+export async function fetchVerse(verseId) {
+    const res = await fetch(`${apiBase}/verse/${verseId}`);
+    return res.json();
+}
+
+export async function fetchRelations(strong) {
+    const res = await fetch(`${apiBase}/words/${encodeURIComponent(strong)}/relations`);
+    return res.json();
+}
+
+export async function fetchRelationTypes() {
+    const res = await fetch(`${apiBase}/relation_types`);
+    return res.json();
+}
+
+export async function fetchGroupedRelations(strong) {
+    const res = await fetch(`${apiBase}/relations/grouped/${encodeURIComponent(strong)}`);
+    return res.json();
+}
+
+export async function fetchChapter(chapterId) {
+    const res = await fetch(`${apiBase}/chapter/${chapterId}`);
+    return res.json();
+}
+
+export async function deleteRelation(relationId) {
+    const res = await fetch(`${apiBase}/relations/${relationId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete relation');
+    return res.json();
+}

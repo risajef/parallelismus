@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Strong definition</title>
+    <style>
+      body { font-family: sans-serif; padding: 1rem }
+    </style>
+  </head>
+  <body>
+    <h1 id="strong-id">Strong</h1>
+    <div id="relations"></div>
+    <script type="module">
+      import * as api from './static/app.js';
+      const strong = location.pathname.split('/').pop();
+      document.getElementById('strong-id').textContent = strong;
+      async function load(){
+        const rels = await api.fetchRelations(strong);
+        const el = document.getElementById('relations');
+        el.innerHTML = '<h3>Relations</h3>' + JSON.stringify(rels, null, 2);
+      }
+      load();
+    </script>
+  </body>
+</html>

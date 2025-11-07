@@ -15,6 +15,8 @@
   .word-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: .4rem .6rem; border-radius: 6px; background: #fafafa; border: 1px solid #eee; min-width: 4ch; text-align: center }
   .word-english { font-weight: 600; font-size: 1rem; color: #111 }
   .word-original { font-family: serif; font-size: .95rem; color: #333; margin-top: .15rem }
+  .word-box.selectable { cursor: pointer }
+  .word-box.selected { background: #e6f0ff; border-color: #9fc5ff; box-shadow: 0 1px 0 rgba(0,0,0,0.03) }
       /* tooltip */
       #word-tooltip { position: absolute; background: #fff; border: 1px solid #ccc; padding: .5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.12); display: none; z-index: 1000; max-width: 40rem; white-space: pre-wrap }
     </style>
@@ -42,12 +44,23 @@
     <div style="margin-top:1rem">
       <h3>Add relation</h3>
       <div>
-        <input id="src" placeholder="source word id" />
-        <input id="tgt" placeholder="target word id" />
-        <input id="type" placeholder="relation type (similar/opposite/subcategory/compose)" />
+  <input id="src" placeholder="source strong" />
+  <input id="tgt" placeholder="target strong" />
+  <!-- allow typing a new relation type or choosing from existing via datalist -->
+  <input id="type" list="relation-types" placeholder="relation type (similar/opposite/...)" />
+  <datalist id="relation-types"></datalist>
         <button id="addRel">Add</button>
       </div>
       <pre id="result"></pre>
+    </div>
+
+    <div style="margin-top:1rem">
+      <h3>Relations</h3>
+      <div>
+        <input id="relations-strong" placeholder="strong id to inspect" />
+        <button id="showRelations">Show relations</button>
+      </div>
+      <ul id="relations-list"></ul>
     </div>
 
     <script type="module">
@@ -136,13 +149,112 @@
             const allTranslations = Array.isArray(w.all_translations) ? w.all_translations : [];
             box.dataset.allOriginals = JSON.stringify(allOriginals);
             box.dataset.allTranslations = JSON.stringify(allTranslations);
+            // store the strong id on the chip for selection and relations
+            box.dataset.strong = w.strong || '';
+
+            // small link icon to open strong definition in new tab
+            const strongLink = document.createElement('a');
+            strongLink.href = '/strong/' + encodeURIComponent(w.strong);
+            strongLink.target = '_blank';
+            strongLink.textContent = '🔗';
+            strongLink.style.fontSize = '0.8rem';
+            strongLink.style.marginTop = '0.25rem';
+            strongLink.title = 'Open strong ' + w.strong;
+            // clicking the link should not toggle chip selection
+            strongLink.addEventListener('click', (e)=> e.stopPropagation());
+            box.appendChild(strongLink);
 
             box.appendChild(top);
             box.appendChild(bottom);
+            // allow click-to-select for relation creation
+            box.classList.add('selectable');
+            box.addEventListener('click', (ev) => {
+              box.classList.toggle('selected');
+              // fill src/tgt inputs depending on selections
+              const selected = Array.from(document.querySelectorAll('.word-box.selected'));
+              if (selected.length === 1) {
+                document.getElementById('src').value = selected[0].dataset.strong || '';
+              } else if (selected.length === 2) {
+                document.getElementById('src').value = selected[0].dataset.strong || '';
+                document.getElementById('tgt').value = selected[1].dataset.strong || '';
+              }
+            });
             li.appendChild(box);
             wordsEl.appendChild(li);
         });
       }
+
+        // relations panel: fetch and show relations for a strong
+        document.getElementById('showRelations').addEventListener('click', async ()=>{
+          const strong = document.getElementById('relations-strong').value.trim();
+          if (!strong) return;
+          const groups = await api.fetchGroupedRelations(strong);
+          const list = document.getElementById('relations-list');
+          list.innerHTML = '';
+          groups.forEach(g => {
+            const li = document.createElement('li');
+            const header = document.createElement('div');
+            header.textContent = `${g.relation_type}: ${g.source_id} → ${g.target_id}`;
+            li.appendChild(header);
+
+            if (g.source_verse_ids && g.source_verse_ids.length) {
+              const versesContainer = document.createElement('div');
+              versesContainer.style.marginTop = '.25rem';
+              g.source_verse_ids.forEach(vid => {
+                const btn = document.createElement('button');
+                // show the requested label '(Source: Link)'
+                btn.textContent = `(Source: Link) ${vid}`;
+                btn.style.marginRight = '6px';
+                btn.addEventListener('click', async ()=>{
+                  // fetch verse, then navigate selects to the verse's chapter and verse
+                  const verse = await api.fetchVerse(vid);
+                  // load chapters for the book containing the verse's chapter
+                  // we need to find the book id: fetch chapter to get book_id
+                  const chap = await api.fetchChapter(verse.chapter_id);
+                  // load chapters for the book then select the correct chapter and verse
+                  await loadChapters(chap.book_id);
+                  // give the browser a tick to render the new chapter options, then select
+                  setTimeout(async ()=>{
+                    chaptersEl.value = String(chap.id);
+                    await loadVerses(chap.id);
+                    // now select the verse
+                    versesEl.value = String(verse.id);
+                  }, 150);
+                });
+                versesContainer.appendChild(btn);
+              });
+              li.appendChild(versesContainer);
+            }
+
+            // Add a Remove button to delete the grouped relation entries
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove';
+            removeBtn.style.marginLeft = '8px';
+            removeBtn.addEventListener('click', async ()=>{
+              // ask for confirmation
+              if (!confirm('Remove this relation group? This will delete matching relations individually.')) return;
+              // We need to delete all matching relation rows for this group. The grouped endpoint doesn't return relation ids,
+              // so fetch the full relations for the source word and find matching (source,target,type) tuples.
+              try {
+                const full = await api.fetchRelations(g.source_id);
+                // find all relations matching this group
+                const toDelete = full.filter(r => r.source_id === g.source_id && r.target_id === g.target_id && r.relation_type === g.relation_type);
+                for (const r of toDelete) {
+                  await api.deleteRelation(r.id);
+                }
+                // refresh the list
+                document.getElementById('showRelations').click();
+                // refresh relation types too
+                await populateRelationTypes();
+              } catch (err) {
+                alert('Failed to remove relation(s): ' + String(err));
+              }
+            });
+            li.appendChild(removeBtn);
+
+            list.appendChild(li);
+          });
+        });
 
       // Custom tooltip element (single shared element)
       const tooltip = document.createElement('div');
@@ -245,15 +357,44 @@
         const srcEl = document.getElementById('src');
         const tgtEl = document.getElementById('tgt');
         const typeEl = document.getElementById('type');
-        const src = Number(srcEl && srcEl.value ? srcEl.value : 0);
-        const tgt = Number(tgtEl && tgtEl.value ? tgtEl.value : 0);
-        const type = typeEl && typeEl.value ? typeEl.value : '';
+        const src = srcEl && srcEl.value ? srcEl.value : '';
+        const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
+        const type = typeEl && typeEl.value ? typeEl.value.trim() : '';
+        if (!src || !tgt) {
+          resultEl.textContent = 'Please select source and target words (two chips)';
+          return;
+        }
+        if (!type) {
+          resultEl.textContent = 'Please enter or select a relation type';
+          return;
+        }
         const payload = { source_id: src, target_id: tgt, relation_type: type };
-        const res = await api.addRelation(payload);
-        resultEl.textContent = JSON.stringify(res, null, 2);
+        // include currently selected verse as source_verse_id when available
+        const verseId = Number(versesEl && versesEl.value ? versesEl.value : 0);
+        if (verseId) payload.source_verse_id = verseId;
+        try {
+          const res = await api.addRelation(payload);
+          resultEl.textContent = 'Relation added: ' + JSON.stringify(res);
+          // refresh relation types so new type is available
+          await populateRelationTypes();
+          // clear selections and inputs
+          document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
+          srcEl.value = '';
+          tgtEl.value = '';
+          // keep the type in the field so user can reuse it
+        } catch (err) {
+          resultEl.textContent = 'Error adding relation: ' + String(err);
+        }
       });
 
       loadBooks();
+      // populate relation types
+      async function populateRelationTypes(){
+        const types = await api.fetchRelationTypes();
+        const data = document.getElementById('relation-types');
+        data.innerHTML = types.map(t=>`<option value="${t}"></option>`).join('');
+      }
+      populateRelationTypes();
     </script>
   </body>
 </html>
