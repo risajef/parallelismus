@@ -2,3 +2,6 @@
 __pycache__/
 bible/
 *.db-journal
+*.7z
+*.sql
+.vscode/settings.json

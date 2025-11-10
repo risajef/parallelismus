@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
+import logging
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlmodel import select
 from typing import List
 from pydantic import BaseModel
@@ -56,6 +57,9 @@ class WordInChapter(BaseModel):
 
 
 app = FastAPI(title="Parallelismus API")
+
+# basic logging to stdout for debugging incoming requests
+logging.basicConfig(level=logging.INFO)
 
 # serve the frontend static files from the frontend/ directory at /static
 
@@ -179,6 +183,53 @@ def get_verse(verse_id: int, request: Request):
         if not verse:
             raise HTTPException(status_code=404, detail="Verse not found")
         return verse
+
+
+@app.get("/strong", include_in_schema=False)
+def strong_search_page():
+    """Serve the Strong search frontend page."""
+    return FileResponse("frontend/strong_search.html")
+
+
+@app.get("/strong/search")
+@app.get("/strong/search/")
+def strong_search(q: str, request: Request):
+    """Search Word rows by substring match across translations and originals (case-insensitive).
+    Returns a list of Word objects (strong, original[], translation[]).
+    """
+    # Log request metadata to help debug cases where HTML is returned to the client
+    try:
+        client = request.client.host if request.client else 'unknown'
+    except Exception:
+        client = 'unknown'
+    accept = request.headers.get('accept', '')
+    logging.info(f"/strong/search called q={q!r} from={client} accept={accept!r}")
+    from sqlmodel import Session
+    from sqlmodel import select as _select
+    term = q.strip().lower()
+    if not term:
+        return []
+    with Session(engine) as session:
+        # SQLite stores JSON as text; simplest robust approach is to load all words and filter in Python.
+        # This is acceptable for a small dataset like a bible wordlist.
+        rows = session.exec(_select(Word)).all()
+        out = []
+        for w in rows:
+            matched = False
+            # check translations
+            for t in (w.translation or []):
+                if t and term in t.lower():
+                    matched = True
+                    break
+            if not matched:
+                for o in (w.original or []):
+                    if o and term in o.lower():
+                        matched = True
+                        break
+            if matched:
+                out.append({"strong": w.strong, "original": w.original, "translation": w.translation})
+    # return explicit JSON response to avoid content negotiation returning HTML
+    return JSONResponse(content=out)
 
 
 @app.get("/strong/{strong}", include_in_schema=False)
