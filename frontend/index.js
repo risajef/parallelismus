@@ -81,20 +81,65 @@ function transliterateGreek(s) {
 
 function transliterateHebrew(s) {
   if (!s) return '';
-  let t = removeCombiningMarks(s);
-  const map = {
-    '\u05D0':'', '\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v',
+  // decompose so base letters and niqqud are separate
+  const decomp = s.normalize('NFD');
+  const letterMap = {
+    '\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v',
     '\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k',
     '\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'',
     '\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r',
     '\u05E9':'sh','\u05EA':'t'
   };
-  let out = '';
-  for (const ch of t) {
-    out += (map[ch] !== undefined) ? map[ch] : (/[A-Za-z0-9]/.test(ch) ? ch : '');
+  const vowelMap = {
+    '\u05B0':'e','\u05B1':'e','\u05B2':'a','\u05B3':'a','\u05B4':'i','\u05B5':'e',
+    '\u05B6':'e','\u05B7':'a','\u05B8':'a','\u05B9':'o','\u05BB':'u','\u05C7':'o'
+  };
+  const SHIN_DOT = '\u05C1';
+  const SIN_DOT = '\u05C2';
+
+  const outParts = [];
+  let lastBase = -1;
+  for (let i = 0; i < decomp.length; i++) {
+    const ch = decomp[i];
+    const cp = ch.codePointAt(0);
+    // Hebrew base letters U+05D0..U+05EA
+    if (cp >= 0x05D0 && cp <= 0x05EA) {
+      const mapped = (letterMap[ch] !== undefined) ? letterMap[ch] : '';
+      outParts.push(mapped);
+      lastBase = outParts.length - 1;
+      continue;
+    }
+    // vowels (niqqud)
+    if (vowelMap[ch]) {
+      if (lastBase >= 0) {
+        outParts[lastBase] = outParts[lastBase] + vowelMap[ch];
+      } else {
+        outParts.push(vowelMap[ch]);
+        lastBase = outParts.length - 1;
+      }
+      continue;
+    }
+    // shin/sin dot handling
+    if (ch === SIN_DOT) {
+      if (lastBase >= 0 && outParts[lastBase].endsWith('sh')) {
+        outParts[lastBase] = outParts[lastBase].slice(0, -2) + 's';
+      }
+      continue;
+    }
+    if (ch === SHIN_DOT) {
+      if (lastBase >= 0 && !outParts[lastBase].endsWith('h')) {
+        outParts[lastBase] = outParts[lastBase] + 'h';
+      }
+      continue;
+    }
+    // keep ASCII letters/numbers
+    if (/[A-Za-z0-9]/.test(ch)) {
+      outParts.push(ch);
+      lastBase = outParts.length - 1;
+    }
   }
-  // small normalisations
-  out = out.replace(/''/g, "'").replace(/\s+/g, ' ').trim();
+  let out = outParts.join('');
+  out = out.replace(/''/g, "'").trim();
   return out.toLowerCase();
 }
 

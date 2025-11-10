@@ -140,11 +140,79 @@ function transliterateGreek(s) {
 }
 function transliterateHebrew(s) {
     if (!s) return '';
-    let t = removeCombiningMarks(s);
-    const map = { '\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v','\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k','\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'','\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r','\u05E9':'sh','\u05EA':'t' };
-    let out = '';
-    for (const ch of t) out += (map[ch] !== undefined) ? map[ch] : (/[A-Za-z0-9]/.test(ch) ? ch : '');
-    out = out.replace(/''/g, "'").replace(/\s+/g, ' ').trim();
+    // normalize to decompose base letters and combining marks (niqqud)
+    const decomp = s.normalize('NFD');
+    const letterMap = { '\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v','\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k','\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'','\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r','\u05E9':'sh','\u05EA':'t' };
+    // combining marks (niqqud) mapping to Latin vowels
+    const vowelMap = {
+        '\u05B0':'e', // sheva
+        '\u05B1':'e', // hataf segol
+        '\u05B2':'a', // hataf patach
+        '\u05B3':'a', // hataf qamats
+        '\u05B4':'i', // hiriq
+        '\u05B5':'e', // tsere
+        '\u05B6':'e', // segol
+        '\u05B7':'a', // patach
+        '\u05B8':'a', // qamats
+        '\u05B9':'o', // holam
+        '\u05BB':'u', // qubuts
+        '\u05C7':'o'  // qamats qatan
+    };
+
+    const SHIN_DOT = '\u05C1';
+    const SIN_DOT = '\u05C2';
+
+    // Build transliteration by walking decomposed string and attaching vowels to previous base
+    const outParts = [];
+    let lastBaseIndex = -1;
+    for (let i = 0; i < decomp.length; i++) {
+        const ch = decomp[i];
+        // Hebrew base letters range
+        if (/\u05D0-\u05EA/.test(ch)) {
+            // This regex won't work in JS as intended; use codepoint check
+        }
+        const code = ch.codePointAt(0);
+        // base letter range 0x05D0 - 0x05EA
+        if (code >= 0x05D0 && code <= 0x05EA) {
+            const mapped = (letterMap[ch] !== undefined) ? letterMap[ch] : '';
+            outParts.push(mapped);
+            lastBaseIndex = outParts.length - 1;
+            continue;
+        }
+        // combine vowels
+        if (vowelMap[ch]) {
+            if (lastBaseIndex >= 0) {
+                outParts[lastBaseIndex] = outParts[lastBaseIndex] + vowelMap[ch];
+            } else {
+                outParts.push(vowelMap[ch]);
+                lastBaseIndex = outParts.length - 1;
+            }
+            continue;
+        }
+        // shin/sin dot: change previous sh -> s when sin dot, ensure sh when shin dot
+        if (ch === SIN_DOT) {
+            if (lastBaseIndex >= 0 && outParts[lastBaseIndex].endsWith('sh')) {
+                outParts[lastBaseIndex] = outParts[lastBaseIndex].slice(0, -2) + 's';
+            }
+            continue;
+        }
+        if (ch === SHIN_DOT) {
+            if (lastBaseIndex >= 0 && outParts[lastBaseIndex].endsWith('s')) {
+                outParts[lastBaseIndex] = outParts[lastBaseIndex] + 'h';
+            }
+            continue;
+        }
+        // ignore other combining marks like dagesh (05BC) for now
+        // keep ASCII letters/numbers
+        if (/[A-Za-z0-9]/.test(ch)) {
+            outParts.push(ch);
+            lastBaseIndex = outParts.length - 1;
+        }
+    }
+
+    let out = outParts.join(' ').replace(/\s+/g, ' ').trim();
+    // tidy up common sequences
+    out = out.replace(/''/g, "'");
     return out.toLowerCase();
 }
 export function transliterate(s) {
