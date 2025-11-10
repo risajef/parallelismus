@@ -22,6 +22,7 @@
     </div>
     <script type="module">
       import * as api from '/static/app.js';
+      import { transliterate } from '/static/app.js';
       const strong = location.pathname.split('/').pop();
       document.getElementById('strong-id').textContent = strong;
       async function load(){
@@ -34,7 +35,8 @@
           const d = detail.value;
           vEl.innerHTML = `<h3>Variants</h3>`;
           vEl.innerHTML += `<strong>All translations:</strong> <ul>${d.all_translations.map(t=>`<li>${t}</li>`).join('')}</ul>`;
-          vEl.innerHTML += `<strong>All originals:</strong> <ul>${d.all_originals.map(o=>`<li>${o}</li>`).join('')}</ul>`;
+          // show originals with transliteration if available
+          vEl.innerHTML += `<strong>All originals (with transliteration):</strong> <ul>${d.all_originals.map(o=>{ const tr = transliterate(o||''); return `<li>${o}${tr?` — <em style="font-style:italic;color:#6b7280;margin-left:6px">${tr}</em>`:''}</li>`; }).join('')}</ul>`;
           // usages
           const uEl = document.getElementById('usages');
           uEl.innerHTML = '<h3>Usages</h3>';

@@ -97,3 +97,31 @@ export async function fetchStrongSearch(query) {
     }
     return res.json();
 }
+
+// Lightweight transliteration utility (exported for other pages)
+function removeCombiningMarks(s) {
+    try { return s.normalize('NFD').replace(/\p{M}/gu, ''); } catch (e) { return s; }
+}
+function transliterateGreek(s) {
+    if (!s) return '';
+    let t = removeCombiningMarks(s.toLowerCase());
+    const map = { 'α':'a','β':'b','γ':'g','δ':'d','ε':'e','ζ':'z','η':'e','θ':'th','ι':'i','κ':'k','λ':'l','μ':'m','ν':'n','ξ':'x','ο':'o','π':'p','ρ':'r','σ':'s','ς':'s','τ':'t','υ':'u','φ':'ph','χ':'ch','ψ':'ps','ω':'o' };
+    let out = '';
+    for (const ch of t) out += (map[ch] !== undefined) ? map[ch] : (/[a-z0-9]/.test(ch) ? ch : '');
+    out = out.replace(/uu/g, 'u').replace(/phh/g, 'ph');
+    return out;
+}
+function transliterateHebrew(s) {
+    if (!s) return '';
+    let t = removeCombiningMarks(s);
+    const map = { '\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v','\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k','\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'','\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r','\u05E9':'sh','\u05EA':'t' };
+    let out = '';
+    for (const ch of t) out += (map[ch] !== undefined) ? map[ch] : (/[A-Za-z0-9]/.test(ch) ? ch : '');
+    out = out.replace(/''/g, "'").replace(/\s+/g, ' ').trim();
+    return out.toLowerCase();
+}
+export function transliterate(s) {
+    if (!s) return '';
+    try { if (/\p{Script=Greek}/u.test(s)) return transliterateGreek(s); if (/\p{Script=Hebrew}/u.test(s)) return transliterateHebrew(s); } catch (e) { if (/[\u0370-\u03FF]/.test(s)) return transliterateGreek(s); if (/[\u0590-\u05FF]/.test(s)) return transliterateHebrew(s); }
+    return '';
+}

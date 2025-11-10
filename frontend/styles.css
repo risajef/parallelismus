@@ -26,6 +26,8 @@ button:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(37,99,235,0.0
 .word-box:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(2,6,23,0.08)}
 .word-english{font-weight:600;color:#0f172a}
 .word-original{font-family: 'Noto Serif', serif;color:var(--muted);margin-top:.15rem;font-size:.95rem}
+/* transliteration text shown under originals */
+.word-translit{font-size:.82rem;color:var(--muted);font-style:italic;margin-top:.12rem}
 .word-box.selected{outline:3px solid rgba(37,99,235,0.12);box-shadow:0 6px 14px rgba(37,99,235,0.06)}
 /* relations */
 #relations-list{margin:0;padding:0}
