@@ -63,6 +63,12 @@ export async function fetchChapter(chapterId) {
     return res.json();
 }
 
+export async function fetchWordDetail(strong) {
+    const res = await fetch(`${apiBase}/words/${encodeURIComponent(strong)}/detail`);
+    if (!res.ok) throw new Error('Failed to fetch word detail');
+    return res.json();
+}
+
 export async function deleteRelation(relationId) {
     const res = await fetch(`${apiBase}/relations/${relationId}`, {
         method: 'DELETE',

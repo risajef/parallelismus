@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -6,7 +6,7 @@ from sqlmodel import select
 from typing import List
 from pydantic import BaseModel
 
-from .database import create_db_and_tables, get_session, engine
+from .database import create_db_and_tables, engine
 from .models import Book, Chapter, Verse, Word, Relation, VerseWord
 
 
@@ -28,12 +28,38 @@ class RelationGroup(BaseModel):
     source_verse_ids: list[int]
 
 
+class WordUsage(BaseModel):
+    verse_id: int
+    verse_number: int
+    chapter_id: int
+    chapter_number: int
+    book_id: int
+    book_name: str
+    verse_original: str
+    verse_translation: str
+
+
+class WordDetail(BaseModel):
+    strong: str
+    all_originals: list[str]
+    all_translations: list[str]
+    usages: list[WordUsage]
+
+
+class WordInChapter(BaseModel):
+    verse_id: int
+    strong: str
+    verse_original: str
+    verse_translation: str
+    all_originals: list[str]
+    all_translations: list[str]
+
+
 app = FastAPI(title="Parallelismus API")
 
 # serve the frontend static files from the frontend/ directory at /static
-app.mount("/static", StaticFiles(directory="frontend"), name="frontend-static")
 
-from fastapi.responses import FileResponse
+app.mount("/static", StaticFiles(directory="frontend"), name="frontend-static")
 
 
 @app.get("/", include_in_schema=False)
@@ -103,6 +129,33 @@ def get_relations(word_id: str):
         return session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
 
 
+@app.get("/words/{strong}/detail", response_model=WordDetail)
+def get_word_detail(strong: str):
+    """Return word variants and list of usages (which verse/chapter/book and the verse-canonical original/translation)."""
+    from sqlmodel import Session
+    from sqlmodel import select as _select
+    with Session(engine) as session:
+        word = session.get(Word, strong)
+        if not word:
+            raise HTTPException(status_code=404, detail="Word not found")
+        # find usages from VerseWord join Verse->Chapter->Book
+        stmt = _select(VerseWord, Verse, Chapter, Book).join(Verse, Verse.id == VerseWord.verse_id).join(Chapter, Chapter.id == Verse.chapter_id).join(Book, Book.id == Chapter.book_id).where(VerseWord.word_id == strong)
+        rows = session.exec(stmt).all()
+        usages: list[WordUsage] = []
+        for vw, verse, chap, book in rows:
+            usages.append(WordUsage(
+                verse_id=(vw.verse_id if vw.verse_id is not None else 0),
+                verse_number=(verse.number if verse.number is not None else 0),
+                chapter_id=(chap.id if chap.id is not None else 0),
+                chapter_number=(chap.number if chap.number is not None else 0),
+                book_id=(book.id if book.id is not None else 0),
+                book_name=book.name,
+                verse_original=vw.original or '',
+                verse_translation=vw.translation or ''
+            ))
+        return WordDetail(strong=word.strong, all_originals=word.original, all_translations=word.translation, usages=usages)
+
+
 @app.get("/relation_types", response_model=List[str])
 def list_relation_types():
     from sqlmodel import Session
@@ -114,8 +167,13 @@ def list_relation_types():
 
 
 @app.get("/verse/{verse_id}", response_model=Verse)
-def get_verse(verse_id: int):
+def get_verse(verse_id: int, request: Request):
+    """Return verse JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
     from sqlmodel import Session
+    # if the client accepts HTML, serve the SPA so users can deep-link to /verse/{id}
+    accept = request.headers.get('accept', '')
+    if 'text/html' in accept:
+        return FileResponse("frontend/index.html")
     with Session(engine) as session:
         verse = session.get(Verse, verse_id)
         if not verse:
@@ -129,14 +187,52 @@ def strong_page(strong: str):
     return FileResponse("frontend/strong.html")
 
 
+@app.get("/book/{book_id}/chapter/{chapter_id}", include_in_schema=False)
+def book_chapter_page(book_id: int, chapter_id: int):
+    """Serve the SPA for direct navigation to a chapter."""
+    return FileResponse("frontend/index.html")
+
+
+@app.get("/book/{book_id}/chapter/{chapter_id}/verse/{verse_id}", include_in_schema=False)
+def book_chapter_verse_page(book_id: int, chapter_id: int, verse_id: int):
+    """Serve the SPA for direct navigation to a verse."""
+    return FileResponse("frontend/index.html")
+
+
 @app.get("/chapter/{chapter_id}", response_model=Chapter)
-def get_chapter(chapter_id: int):
+def get_chapter(chapter_id: int, request: Request):
+    """Return chapter JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
     from sqlmodel import Session
+    accept = request.headers.get('accept', '')
+    if 'text/html' in accept:
+        return FileResponse("frontend/index.html")
     with Session(engine) as session:
         chap = session.get(Chapter, chapter_id)
         if not chap:
             raise HTTPException(status_code=404, detail="Chapter not found")
         return chap
+
+
+@app.get("/chapter/{chapter_id}/words", response_model=List[WordInChapter])
+def list_chapter_words(chapter_id: int):
+    """Return all WordInVerse-like rows for every verse in a chapter in a single query."""
+    from sqlmodel import Session
+    from sqlmodel import select as _select
+    with Session(engine) as session:
+        # join Verse -> VerseWord -> Word, filter by Verse.chapter_id
+        stmt = _select(VerseWord, Word, Verse).join(Verse, Verse.id == VerseWord.verse_id).join(Word, Word.strong == VerseWord.word_id).where(Verse.chapter_id == chapter_id)
+        rows = session.exec(stmt).all()
+        out: list[WordInChapter] = []
+        for vw, word, verse in rows:
+            out.append(WordInChapter(
+                verse_id=(vw.verse_id or 0),
+                strong=word.strong,
+                verse_original=vw.original or '',
+                verse_translation=vw.translation or '',
+                all_originals=word.original,
+                all_translations=word.translation
+            ))
+        return out
 
 
 @app.get("/relations/grouped/{word_id}", response_model=List[RelationGroup])
