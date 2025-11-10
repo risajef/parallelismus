@@ -14,20 +14,32 @@ try {
     apiBase = '';
 }
 export async function fetchBooks() {
-    const res = await fetch(`${apiBase}/books`);
-    return res.json();
+    const res = await fetch(`${apiBase}/books`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchBooks failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchBooks returned HTML instead of JSON');
+        return res.json();
 }
 export async function fetchChapters(bookId) {
-    const res = await fetch(`${apiBase}/books/${bookId}/chapters`);
-    return res.json();
+    const res = await fetch(`${apiBase}/books/${bookId}/chapters`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchChapters failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchChapters returned HTML instead of JSON');
+        return res.json();
 }
 export async function fetchVerses(chapterId) {
-    const res = await fetch(`${apiBase}/chapters/${chapterId}/verses`);
-    return res.json();
+    const res = await fetch(`${apiBase}/chapters/${chapterId}/verses`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchVerses failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchVerses returned HTML instead of JSON');
+        return res.json();
 }
 export async function fetchWords(verseId) {
-    const res = await fetch(`${apiBase}/verses/${verseId}/words`);
-    return res.json();
+    const res = await fetch(`${apiBase}/verses/${verseId}/words`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchWords failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchWords returned HTML instead of JSON');
+        return res.json();
 }
 export async function addRelation(payload) {
     const res = await fetch(`${apiBase}/relations`, {
@@ -39,28 +51,43 @@ export async function addRelation(payload) {
 }
 
 export async function fetchVerse(verseId) {
-    const res = await fetch(`${apiBase}/verse/${verseId}`);
-    return res.json();
+    const res = await fetch(`${apiBase}/verse/${verseId}`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchVerse failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchVerse returned HTML instead of JSON');
+        return res.json();
 }
 
 export async function fetchRelations(strong) {
-    const res = await fetch(`${apiBase}/words/${encodeURIComponent(strong)}/relations`);
-    return res.json();
+    const res = await fetch(`${apiBase}/words/${encodeURIComponent(strong)}/relations`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchRelations failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchRelations returned HTML instead of JSON');
+        return res.json();
 }
 
 export async function fetchRelationTypes() {
-    const res = await fetch(`${apiBase}/relation_types`);
-    return res.json();
+    const res = await fetch(`${apiBase}/relation_types`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchRelationTypes failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchRelationTypes returned HTML instead of JSON');
+        return res.json();
 }
 
 export async function fetchGroupedRelations(strong) {
-    const res = await fetch(`${apiBase}/relations/grouped/${encodeURIComponent(strong)}`);
-    return res.json();
+    const res = await fetch(`${apiBase}/relations/grouped/${encodeURIComponent(strong)}`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchGroupedRelations failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchGroupedRelations returned HTML instead of JSON');
+        return res.json();
 }
 
 export async function fetchChapter(chapterId) {
-    const res = await fetch(`${apiBase}/chapter/${chapterId}`);
-    return res.json();
+    const res = await fetch(`${apiBase}/chapter/${chapterId}`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`fetchChapter failed: ${res.status} ${res.statusText}`);
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/html')) throw new Error('fetchChapter returned HTML instead of JSON');
+        return res.json();
 }
 
 export async function fetchWordDetail(strong) {

@@ -6,6 +6,8 @@ const chaptersEl = document.getElementById('chapters');
 const versesEl = document.getElementById('verses');
 const wordsEl = document.getElementById('words');
 const resultEl = document.getElementById('result');
+const nextChapterBtn = document.getElementById('next-chapter');
+const nextVerseBtn = document.getElementById('next-verse');
 
 // Keep the most-recently-loaded chapters/verses in memory so the dropdowns can use
 // ordinal numbers (chapter.number / verse.number) as option values while we map
@@ -540,6 +542,33 @@ chaptersEl.addEventListener('change', async ()=> {
   history.pushState({}, '', newUrl);
 });
 
+// Advance to the next chapter (by ordinal) for the currently selected book
+async function goToNextChapter(){
+  const currentNumber = Number(chaptersEl.value) || 0;
+  // find the chapter with the next higher ordinal
+  const next = currentChapters.find(c => Number(c.number) === currentNumber + 1);
+  if (!next) {
+    // nothing to do — maybe alert or wrap; keep it simple and do nothing
+    return;
+  }
+  chaptersEl.value = String(next.number);
+  await loadVerses(next.id, { selectVerseId: null, showWholeChapter: true });
+  history.pushState({}, '', `/chapter/${next.id}`);
+}
+
+// Advance to the next verse (by ordinal) in the currently selected chapter
+async function goToNextVerse(){
+  const currentNumber = Number(versesEl.value) || 0;
+  const next = currentVerses.find(v => Number(v.number) === currentNumber + 1);
+  if (!next) return;
+  versesEl.value = String(next.number);
+  await loadWords(next.id);
+  history.pushState({}, '', `/verse/${next.id}`);
+}
+
+if (nextChapterBtn) nextChapterBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await goToNextChapter(); });
+if (nextVerseBtn) nextVerseBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await goToNextVerse(); });
+
 versesEl.addEventListener('change', async ()=> {
   // versesEl.value holds the ordinal verse.number; map to DB id via currentVerses
   const selectedNumber = Number(versesEl.value);
@@ -598,38 +627,48 @@ function parsePath() {
 async function initFromPath() {
   const path = parsePath();
   if (!path.chapterId && !path.verseId) {
-    await loadBooks();
+    try {
+      await loadBooks();
+    } catch (err) {
+      resultEl.textContent = 'Initialization error loading books: ' + String(err);
+      console.error('initFromPath loadBooks error', err);
+    }
     return;
   }
   if (path.chapterId) {
-    const chapter = await api.fetchChapter(path.chapterId);
-    const books = await api.fetchBooks();
+    let chapter;
+    try { chapter = await api.fetchChapter(path.chapterId); } catch (err) { resultEl.textContent = 'Initialization error fetching chapter: ' + String(err); console.error(err); return; }
+    let books;
+    try { books = await api.fetchBooks(); } catch (err) { resultEl.textContent = 'Initialization error fetching books: ' + String(err); console.error(err); return; }
     booksEl.innerHTML = '';
-    booksEl.forEach(b => { const opt = document.createElement('option'); opt.value = b.id; opt.textContent = b.name; booksEl.appendChild(opt); });
+    books.forEach(b => { const opt = document.createElement('option'); opt.value = b.id; opt.textContent = b.name; booksEl.appendChild(opt); });
     booksEl.value = String(chapter.book_id);
     // populate chapters using the shared loader so currentChapters gets set
-    await loadChapters(chapter.book_id);
+    try { await loadChapters(chapter.book_id); } catch (err) { resultEl.textContent = 'Initialization error loading chapters: ' + String(err); console.error(err); return; }
     // select by chapter DB id -> map to ordinal number
     const selectedChap = currentChapters.find(c => Number(c.id) === Number(path.chapterId));
     if (selectedChap) {
       chaptersEl.value = String(selectedChap.number);
-      await loadVerses(selectedChap.id, { selectVerseId: null, showWholeChapter: true });
+      try { await loadVerses(selectedChap.id, { selectVerseId: null, showWholeChapter: true }); } catch (err) { resultEl.textContent = 'Initialization error loading verses: ' + String(err); console.error(err); }
     }
     return;
   }
   if (path.verseId) {
-    const verse = await api.fetchVerse(path.verseId);
-    const chap = await api.fetchChapter(verse.chapter_id);
-    const books = await api.fetchBooks();
+    let verse;
+    try { verse = await api.fetchVerse(path.verseId); } catch (err) { resultEl.textContent = 'Initialization error fetching verse: ' + String(err); console.error(err); return; }
+    let chap;
+    try { chap = await api.fetchChapter(verse.chapter_id); } catch (err) { resultEl.textContent = 'Initialization error fetching chapter: ' + String(err); console.error(err); return; }
+    let books;
+    try { books = await api.fetchBooks(); } catch (err) { resultEl.textContent = 'Initialization error fetching books: ' + String(err); console.error(err); return; }
     booksEl.innerHTML = '';
     books.forEach(b => { const opt = document.createElement('option'); opt.value = b.id; opt.textContent = b.name; booksEl.appendChild(opt); });
     booksEl.value = String(chap.book_id);
     // populate chapters via loader so currentChapters is set
-    await loadChapters(chap.book_id);
+    try { await loadChapters(chap.book_id); } catch (err) { resultEl.textContent = 'Initialization error loading chapters: ' + String(err); console.error(err); return; }
     const selectedChap = currentChapters.find(c => Number(c.id) === Number(chap.id));
     if (selectedChap) {
       chaptersEl.value = String(selectedChap.number);
-      await loadVerses(chap.id, { selectVerseId: path.verseId, showWholeChapter: false });
+      try { await loadVerses(chap.id, { selectVerseId: path.verseId, showWholeChapter: false }); } catch (err) { resultEl.textContent = 'Initialization error loading verses: ' + String(err); console.error(err); }
     }
     return;
   }

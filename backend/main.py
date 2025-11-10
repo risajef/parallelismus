@@ -86,28 +86,28 @@ def on_startup():
 
 
 @app.get("/books", response_model=List[Book])
-def list_books():
+def list_books(request: Request):
     from sqlmodel import Session
     with Session(engine) as session:
         return session.exec(select(Book)).all()
 
 
 @app.get("/books/{book_id}/chapters", response_model=List[Chapter])
-def list_chapters(book_id: int):
+def list_chapters(book_id: int, request: Request):
     from sqlmodel import Session
     with Session(engine) as session:
         return session.exec(select(Chapter).where(Chapter.book_id == book_id)).all()
 
 
 @app.get("/chapters/{chapter_id}/verses", response_model=List[Verse])
-def list_verses(chapter_id: int):
+def list_verses(chapter_id: int, request: Request):
     from sqlmodel import Session
     with Session(engine) as session:
         return session.exec(select(Verse).where(Verse.chapter_id == chapter_id)).all()
 
 
 @app.get("/verses/{verse_id}/words", response_model=List[WordInVerse])
-def list_words(verse_id: int):
+def list_words(verse_id: int, request: Request):
     from sqlmodel import Session
     from sqlmodel import select as _select
     with Session(engine) as session:
@@ -173,9 +173,9 @@ def list_relation_types():
 @app.get("/verse/{verse_id}", response_model=Verse)
 def get_verse(verse_id: int, request: Request):
     """Return verse JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
+    accept = request.headers.get('accept', '')
     from sqlmodel import Session
     # if the client accepts HTML, serve the SPA so users can deep-link to /verse/{id}
-    accept = request.headers.get('accept', '')
     if 'text/html' in accept:
         return FileResponse("frontend/index.html")
     with Session(engine) as session:
@@ -197,13 +197,6 @@ def strong_search(q: str, request: Request):
     """Search Word rows by substring match across translations and originals (case-insensitive).
     Returns a list of Word objects (strong, original[], translation[]).
     """
-    # Log request metadata to help debug cases where HTML is returned to the client
-    try:
-        client = request.client.host if request.client else 'unknown'
-    except Exception:
-        client = 'unknown'
-    accept = request.headers.get('accept', '')
-    logging.info(f"/strong/search called q={q!r} from={client} accept={accept!r}")
     from sqlmodel import Session
     from sqlmodel import select as _select
     term = q.strip().lower()
@@ -250,11 +243,23 @@ def book_chapter_verse_page(book_id: int, chapter_id: int, verse_id: int):
     return FileResponse("frontend/index.html")
 
 
+@app.get("/debug/headers")
+def debug_headers(request: Request):
+    """Return the received request headers and client host for debugging proxies/service-workers."""
+    try:
+        client = request.client.host if request.client else 'unknown'
+    except Exception:
+        client = 'unknown'
+    headers = {k: v for k, v in request.headers.items()}
+    return JSONResponse(content={"client": client, "headers": headers})
+
+
 @app.get("/chapter/{chapter_id}", response_model=Chapter)
 def get_chapter(chapter_id: int, request: Request):
     """Return chapter JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
-    from sqlmodel import Session
     accept = request.headers.get('accept', '')
+    from sqlmodel import Session
+    # if the client accepts HTML, serve the SPA so users can deep-link to /chapter/{id}
     if 'text/html' in accept:
         return FileResponse("frontend/index.html")
     with Session(engine) as session:
@@ -328,3 +333,13 @@ def delete_relation(relation_id: int):
         session.delete(rel)
         session.commit()
         return out
+
+
+@app.get("/{path:path}", include_in_schema=False)
+def catch_all(path: str, request: Request):
+    """Catch-all route: serve index.html for HTML requests, 404 for others."""
+    accept = request.headers.get('accept', '')
+    if 'text/html' in accept:
+        print("catch-all serving index.html for path:", path)
+        return FileResponse("frontend/index.html")
+    raise HTTPException(status_code=404, detail="Not found")
