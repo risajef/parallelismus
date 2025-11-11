@@ -133,6 +133,46 @@ def get_relations(word_id: str):
         return session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
 
 
+@app.get("/relations/batch")
+def relations_batch(ids: str):
+    """Return a mapping of strong id -> boolean indicating whether any relation exists for that id.
+    Expects a comma-separated list of ids in the `ids` query parameter.
+    """
+    ids_list = [i for i in ids.split(',') if i]
+    if not ids_list:
+        return {}
+    from sqlmodel import Session
+    with Session(engine) as session:
+        rows = session.exec(select(Relation).where((Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list)))).all()
+        out = {i: False for i in ids_list}
+        for r in rows:
+            if r.source_id in out:
+                out[r.source_id] = True
+            if r.target_id in out:
+                out[r.target_id] = True
+        return out
+
+
+@app.get("/relations/counts")
+def relations_counts(ids: str):
+    """Return a mapping of strong id -> integer count of relations involving that id.
+    Expects a comma-separated list of ids in the `ids` query parameter.
+    """
+    ids_list = [i for i in ids.split(',') if i]
+    if not ids_list:
+        return {}
+    from sqlmodel import Session
+    with Session(engine) as session:
+        rows = session.exec(select(Relation).where((Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list)))).all()
+        out = {i: 0 for i in ids_list}
+        for r in rows:
+            if r.source_id in out:
+                out[r.source_id] += 1
+            if r.target_id in out:
+                out[r.target_id] += 1
+        return out
+
+
 @app.get("/words/{strong}/detail", response_model=WordDetail)
 def get_word_detail(strong: str):
     """Return word variants and list of usages (which verse/chapter/book and the verse-canonical original/translation)."""

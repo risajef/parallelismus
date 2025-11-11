@@ -29,6 +29,11 @@ button:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(37,99,235,0.0
 /* transliteration text shown under originals */
 .word-translit{font-size:.82rem;color:var(--muted);font-style:italic;margin-top:.12rem}
 .word-box.selected{outline:3px solid rgba(37,99,235,0.12);box-shadow:0 6px 14px rgba(37,99,235,0.06)}
+/* words that already participate in relations */
+.word-box.has-relation{background:linear-gradient(180deg,#fff7ed,#fffbf0);border:1px solid #fde3b7}
+/* small badge showing number of relations */
+.relation-badge{position:absolute;top:-6px;right:-6px;background:#f97316;color:#fff;border-radius:999px;padding:2px 6px;font-size:0.75rem;font-weight:600;box-shadow:0 4px 10px rgba(249,115,22,0.12)}
+.word-box{position:relative}
 /* relations */
 #relations-list{margin:0;padding:0}
 #relations-list li{list-style:none;margin:8px 0}

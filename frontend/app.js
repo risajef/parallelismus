@@ -82,6 +82,28 @@ export async function fetchGroupedRelations(strong) {
         return res.json();
 }
 
+export async function fetchRelationsBatch(ids) {
+    // ids: array of strong ids
+    if (!Array.isArray(ids) || ids.length === 0) return {};
+    const q = ids.join(',');
+    const res = await fetch(`${apiBase}/relations/batch?ids=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`fetchRelationsBatch failed: ${res.status} ${res.statusText}`);
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text/html')) throw new Error('fetchRelationsBatch returned HTML instead of JSON');
+    return res.json();
+}
+
+export async function fetchRelationsCounts(ids) {
+    // ids: array of strong ids
+    if (!Array.isArray(ids) || ids.length === 0) return {};
+    const q = ids.join(',');
+    const res = await fetch(`${apiBase}/relations/counts?ids=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error(`fetchRelationsCounts failed: ${res.status} ${res.statusText}`);
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text/html')) throw new Error('fetchRelationsCounts returned HTML instead of JSON');
+    return res.json();
+}
+
 export async function fetchChapter(chapterId) {
     const res = await fetch(`${apiBase}/chapter/${chapterId}`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error(`fetchChapter failed: ${res.status} ${res.statusText}`);

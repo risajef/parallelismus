@@ -308,6 +308,8 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
         ul.appendChild(li);
       });
       vb.wrapper.appendChild(ul);
+      // mark any words in this verse that already have relations
+      try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { /* ignore marking errors */ }
     }));
     return;
   }
@@ -330,7 +332,7 @@ async function loadWords(verseId){
     const bottom = document.createElement('div');
     bottom.className = 'word-original';
     bottom.textContent = canonicalOriginal || (canonicalTranslation ? '' : w.strong || '(no text)');
-      // transliteration (greek/hebrew)
+    // transliteration (greek/hebrew) 
       const translit = transliterate(canonicalOriginal || '');
       if (translit) {
         const tEl = document.createElement('div');
@@ -380,6 +382,42 @@ async function loadWords(verseId){
     li.appendChild(box);
     wordsEl.appendChild(li);
   });
+    // mark words that have relations (call once for this verse)
+    try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { /* ignore marking errors */ }
+}
+
+// Given an array of strong ids, query the backend for relations for each and mark
+// the corresponding word-box elements with a CSS class when any relation exists.
+async function markWordsWithRelations(strongIds){
+  if (!Array.isArray(strongIds) || strongIds.length === 0) return;
+  // Use a single batch request to determine which ids have relations
+  try {
+    const map = await api.fetchRelationsBatch(strongIds);
+    console.debug('relationsBatch result', map);
+    // Try counts if available to show badges
+    let counts = {};
+    try { counts = await api.fetchRelationsCounts(strongIds).catch(()=>({})); } catch(e) { counts = {}; }
+    for (const id of strongIds){
+      let has = false;
+      if (Object.prototype.hasOwnProperty.call(map, id)) {
+        has = !!map[id];
+      }
+      const els = document.querySelectorAll(`.word-box[data-strong="${CSS.escape(id)}"]`);
+      const c = counts && counts[id] ? Number(counts[id]) : 0;
+      els.forEach(el => {
+        if (has) el.classList.add('has-relation'); else el.classList.remove('has-relation');
+        let badge = el.querySelector('.relation-badge');
+        if (c > 0) {
+          if (!badge) { badge = document.createElement('div'); badge.className = 'relation-badge'; el.appendChild(badge); }
+          badge.textContent = String(c);
+        } else if (badge) {
+          badge.remove();
+        }
+      });
+    }
+  } catch (e) {
+    // fallback: do nothing on failure
+  }
 }
 
 const addPanel = document.getElementById('add-relation-panel');
