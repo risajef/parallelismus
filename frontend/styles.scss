@@ -1,0 +1,123 @@
+// Structured SCSS for Parallelismus frontend
+$bg: #f7fafc;
+$card: #ffffff;
+$muted: #6b7280;
+$accent: #2563eb;
+$chip-bg: #f1f5f9;
+$radius: 10px;
+$shadow: 0 6px 18px rgba(15,23,42,0.06);
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: $bg; color: #0f172a; margin: 0;
+}
+
+.wrap {
+  max-width: 1100px; margin: 28px auto; padding: 20px;
+}
+
+header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+  h1 { 
+    font-weight: 600; margin: 0; font-size: 1.35rem; 
+  }
+}
+
+.controls {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+  select, input, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #e6edf3; background: #fff; }
+  button { 
+    cursor: pointer; transition: all .15s ease; border: 1px solid rgba($accent, .12); background: linear-gradient(180deg, #eff6ff, #e6f0ff); 
+  }
+}
+
+.card { 
+    background: $card; border-radius: $radius; box-shadow: $shadow; padding: 14px; 
+}
+
+.app-shell { 
+    display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; 
+}
+
+.main-column {
+  .words { margin-top: 12px; }
+}
+
+.side-column { width: 320px; position: sticky; top: 20px; height: calc(100vh - 40px); display: flex; flex-direction: column; gap: 12px; }
+
+/* Words / chips */
+#words { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; padding: 0; }
+#words li { list-style: none; }
+
+.word-box {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: .45rem .6rem; border-radius: 8px; background: $chip-bg; border: 1px solid #e6eef3; min-width: 4ch; text-align: center;
+  position: relative;
+  &:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(2,6,23,0.08); }
+  &.selected { outline: 3px solid rgba(37,99,235,0.12); box-shadow: 0 6px 14px rgba(37,99,235,0.06); }
+  &.has-relation { background: linear-gradient(180deg,#fff7ed,#fffbf0); border: 1px solid #fde3b7; }
+}
+.word-english { font-weight: 600; color: #0f172a; }
+.word-original { font-family: 'Noto Serif', serif; color: $muted; margin-top: .15rem; font-size: .95rem; }
+.word-translit { font-size: .82rem; color: $muted; font-style: italic; margin-top: .12rem; }
+
+.relation-badge { position: absolute; top: -6px; right: -6px; background: #f97316; color: #fff; border-radius: 999px; padding: 2px 6px; font-size: .75rem; font-weight: 600; box-shadow: 0 4px 10px rgba(249,115,22,0.12); }
+
+/* Relations list inside side panel */
+#relations-list { margin: 0; padding: 0; }
+#relations-list li { list-style: none; margin: 8px 0; }
+
+/* Add-relation panel small button */
+/* Add-relation panel button layout and styles */
+#add-relation-panel {
+  > div { /* the inner column wrapper */
+    > div { /* the row that contains the buttons */
+      display: flex; gap: 8px; align-items: center;
+    }
+  }
+  button#addRel {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: $accent; color: #fff; border: none; padding: 10px 14px; border-radius: 10px; font-weight: 700;
+    min-height: 42px; line-height: 1; font-size: .95rem;
+    box-shadow: 0 10px 22px rgba(37,99,235,0.10); cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+    &:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(37,99,235,0.14); }
+    &:focus { outline: 3px solid rgba(37,99,235,0.12); }
+    &::before { content: '\2795'; display: inline-block; transform: translateY(-1px); font-size: .95rem; }
+  }
+  button#shortcutInfo { background: transparent; border: 1px solid rgba(0,0,0,0.06); padding: 6px; border-radius: 6px; font-size: .95rem; &:hover { background: rgba(0,0,0,0.03); } }
+}
+
+/* Show Relations button (in relations panel) */
+#relations-panel {
+  button#showRelations {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; color: $accent; border: 1px solid rgba(37,99,235,0.14); padding: 8px 12px; border-radius: 10px; font-weight: 600; cursor: pointer;
+    min-height: 40px; transition: background .12s ease, transform .1s ease, box-shadow .12s ease;
+    &:hover { background: rgba(37,99,235,0.04); transform: translateY(-1px); box-shadow: 0 8px 18px rgba(37,99,235,0.06); }
+    &:focus { outline: 3px solid rgba(37,99,235,0.08); }
+    &::before { content: '\1F50D'; display: inline-block; }
+  }
+}
+
+/* Tooltip */
+#word-tooltip { border-radius: 10px; font-family: Inter, system-ui, Arial; color: #0f172a; display: block; z-index: 50; opacity: 0; pointer-events: auto; max-width: 100%; background: linear-gradient(180deg,#ffffff,#fbfdff); border: 1px solid rgba(2,6,23,0.06); box-shadow: 0 8px 18px rgba(2,6,23,0.06); padding: 10px; border-radius: 8px; margin-top: 10px; transition: opacity .12s ease; &.show { opacity: 1; }
+  .tooltip-grid { gap: .5rem; display: grid; grid-template-columns: 1fr 1fr; }
+  .tooltip-col { padding-right: 6px; }
+  h4 { font-size: .85rem; margin: 0 0 .25rem 0; color: $muted; }
+  ul { margin: 0; padding-left: 1rem; }
+  li { font-size: .95rem; margin-bottom: .25rem; }
+}
+
+/* Chapter / verse layout */
+.chapter-view { display: block; width: 100%; }
+.verse-words { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.verse-words li { display: inline-flex; }
+
+@media (max-width: 920px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .side-column { position: static; width: 100%; height: auto; }
+}
+
+@media (max-width:720px) { .wrap { padding: 12px; } }

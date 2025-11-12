@@ -1,0 +1,12 @@
+{
+  "name": "parallelismus-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "devDependencies": {
+    "sass": "^1.73.1"
+  },
+  "scripts": {
+    "build:css": "sass frontend/styles.scss frontend/styles.css --no-source-map --style=expanded",
+    "watch:css": "sass --watch frontend/styles.scss:frontend/styles.css --style=expanded"
+  }
+}

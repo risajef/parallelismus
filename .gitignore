@@ -5,3 +5,5 @@ bible/
 *.7z
 *.sql
 .vscode/settings.json
+node_modules/
+package-lock.json
