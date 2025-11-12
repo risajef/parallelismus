@@ -470,10 +470,30 @@ document.getElementById('showRelations').addEventListener('click', async ()=>{
   const groups = await api.fetchGroupedRelations(strong);
   const list = document.getElementById('relations-list');
   list.innerHTML = '';
-  groups.forEach(g => {
+  for (const g of groups) {
     const li = document.createElement('li');
     const header = document.createElement('div');
-    header.textContent = `${g.relation_type}: ${g.source_id} → ${g.target_id}`;
+    // fetch a short display label for source and target (prefer original, then translation)
+    let srcLabel = g.source_id;
+    let tgtLabel = g.target_id;
+    try {
+      const [srcDetail, tgtDetail] = await Promise.allSettled([
+        api.fetchWordDetail(g.source_id),
+        api.fetchWordDetail(g.target_id),
+      ]);
+      if (srcDetail.status === 'fulfilled' && srcDetail.value) {
+        const v = srcDetail.value;
+        srcLabel = (Array.isArray(v.all_originals) && v.all_originals[0]) || (Array.isArray(v.all_translations) && v.all_translations[0]) || g.source_id;
+      }
+      if (tgtDetail.status === 'fulfilled' && tgtDetail.value) {
+        const v = tgtDetail.value;
+        tgtLabel = (Array.isArray(v.all_originals) && v.all_originals[0]) || (Array.isArray(v.all_translations) && v.all_translations[0]) || g.target_id;
+      }
+    } catch (e) {
+      // ignore fetch errors, fall back to ids
+    }
+
+    header.textContent = `${g.relation_type}: ${srcLabel} (${g.source_id}) → ${tgtLabel} (${g.target_id})`;
     li.appendChild(header);
 
     if (g.source_verse_ids && g.source_verse_ids.length) {
@@ -523,42 +543,20 @@ document.getElementById('showRelations').addEventListener('click', async ()=>{
     li.appendChild(removeBtn);
 
     list.appendChild(li);
-  });
+  }
 });
 
+// Create a static tooltip container inside the add-relation panel
+const addRelPanel = document.getElementById('add-relation-panel');
 const tooltip = document.createElement('div');
 tooltip.id = 'word-tooltip';
-tooltip.style.pointerEvents = 'none';
-document.body.appendChild(tooltip);
-const tooltipStyle = document.createElement('style');
-tooltipStyle.textContent = `
-  #word-tooltip .tooltip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-  #word-tooltip .tooltip-col { padding: 0; margin: 0 }
-  #word-tooltip .tooltip-col h4 { margin: 0 0 .25rem 0; font-size: .95em }
-  #word-tooltip .tooltip-col ul { margin: 0; padding-left: 1rem }
-`;
-document.head.appendChild(tooltipStyle);
-
-const mainColumn = document.querySelector('.main-column');
-function positionTooltipBottom() {
-  try {
-    const colRect = mainColumn.getBoundingClientRect();
-    const tw = tooltip.getBoundingClientRect();
-    let left = Math.round(colRect.left + (colRect.width - tw.width) / 2);
-    if (left < 8) left = 8;
-    if (left + tw.width + 8 > window.innerWidth) left = Math.max(8, window.innerWidth - tw.width - 8);
-    let top = Math.round(colRect.bottom - tw.height - 12);
-    if (top < 8) top = 8;
-    tooltip.style.left = (window.scrollX + left) + 'px';
-    tooltip.style.top = (window.scrollY + top) + 'px';
-  } catch (e) {
-    const tw = tooltip.getBoundingClientRect();
-    const left = Math.max(8, Math.round((window.innerWidth - tw.width) / 2));
-    const top = Math.max(8, Math.round(window.innerHeight - tw.height - 20));
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = (window.scrollY + top) + 'px';
-  }
-}
+tooltip.style.pointerEvents = 'auto';
+tooltip.classList.add('static');
+// place it at the end of the panel so it appears below the form inputs
+if (addRelPanel) addRelPanel.appendChild(tooltip);
+// accessibility
+tooltip.setAttribute('role', 'status');
+tooltip.setAttribute('aria-live', 'polite');
 
 let activeTarget = null;
 function handleMouseOver(ev) {
@@ -575,7 +573,6 @@ function handleMouseOver(ev) {
     const rightList = sampledOriginals.length ? '<ul>' + sampledOriginals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
     tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
     tooltip.classList.add('show');
-    positionTooltipBottom();
   }
 }
 function handleMouseOut(ev) {
@@ -591,8 +588,43 @@ function handleMouseOut(ev) {
 }
 document.body.addEventListener('mouseover', handleMouseOver);
 document.body.addEventListener('mouseout', handleMouseOut);
-window.addEventListener('scroll', () => { if (tooltip.classList.contains('show')) positionTooltipBottom(); }, { passive: true });
-window.addEventListener('resize', () => { if (tooltip.classList.contains('show')) positionTooltipBottom(); });
+
+// Shortcut info button behavior and keyboard shortcuts
+const shortcutBtn = document.getElementById('shortcutInfo');
+let showShortcuts = false;
+function buildShortcutHtml() {
+  return `<div style="margin-top:6px;font-size:.9rem;color:var(--muted)"><strong>Keyboard</strong><ul style="margin:6px 0 0 1rem;padding:0"><li>Alt+S — focus Source input</li><li>Alt+T — focus Target input</li><li>Alt+R — focus Relation type</li><li>Alt+Enter — Add Relation</li></ul></div>`;
+}
+if (shortcutBtn) {
+  shortcutBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showShortcuts = !showShortcuts;
+    if (showShortcuts) {
+      tooltip.classList.add('show');
+      // append keyboard help to existing content (or show if empty)
+      tooltip.innerHTML = (tooltip.innerHTML || '<div>-</div>') + buildShortcutHtml();
+      shortcutBtn.setAttribute('aria-pressed', 'true');
+    } else {
+      tooltip.classList.remove('show');
+      shortcutBtn.setAttribute('aria-pressed', 'false');
+    }
+  });
+}
+
+// Keyboard shortcuts: Alt+S/T/R and Alt+Enter
+document.addEventListener('keydown', (ev) => {
+  if (!ev.altKey) return;
+  const code = ev.key.toLowerCase();
+  if (code === 's') {
+    ev.preventDefault(); document.getElementById('src')?.focus();
+  } else if (code === 't') {
+    ev.preventDefault(); document.getElementById('tgt')?.focus();
+  } else if (code === 'r') {
+    ev.preventDefault(); document.getElementById('type')?.focus();
+  } else if (ev.key === 'Enter') {
+    ev.preventDefault(); document.getElementById('addRel')?.click();
+  }
+});
 
 document.body.addEventListener('focusin', (ev) => {
   const target = ev.target;
@@ -603,9 +635,8 @@ document.body.addEventListener('focusin', (ev) => {
     try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
     const leftList = translations.length ? '<ul>' + translations.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>' : '<div>-</div>';
     const rightList = originals.length ? '<ul>' + originals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
-    tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
-    tooltip.classList.add('show');
-    positionTooltipBottom();
+  tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
+  tooltip.classList.add('show');
   }
 });
 document.body.addEventListener('focusout', (ev) => {

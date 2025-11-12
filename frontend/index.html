@@ -42,7 +42,10 @@
               <input id="tgt" placeholder="target strong" />
               <input id="type" list="relation-types" placeholder="relation type" />
               <datalist id="relation-types"></datalist>
-              <button id="addRel">Add Relation</button>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button id="addRel">Add Relation</button>
+                <button id="shortcutInfo" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">ℹ️</button>
+              </div>
               <div id="result" style="margin-top:8px;color:#111"></div>
             </div>
           </div>

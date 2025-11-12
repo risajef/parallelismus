@@ -34,24 +34,25 @@ button:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(37,99,235,0.0
 /* small badge showing number of relations */
 .relation-badge{position:absolute;top:-6px;right:-6px;background:#f97316;color:#fff;border-radius:999px;padding:2px 6px;font-size:0.75rem;font-weight:600;box-shadow:0 4px 10px rgba(249,115,22,0.12)}
 .word-box{position:relative}
+/* small info/shortcut button next to Add Relation */
+#add-relation-panel button#shortcutInfo{background:transparent;border:1px solid rgba(0,0,0,0.06);padding:6px;border-radius:6px;font-size:0.95rem}
+#add-relation-panel button#shortcutInfo:hover{background:rgba(0,0,0,0.03)}
 /* relations */
 #relations-list{margin:0;padding:0}
 #relations-list li{list-style:none;margin:8px 0}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
-/* tooltip */
+/* tooltip (static inside add-relation panel) */
 #word-tooltip{border-radius:10px;font-family:Inter,system-ui,Arial;color:#0f172a}
-/* tooltip should be fixed positioned and hidden until shown */
-#word-tooltip{position:fixed;display:block;z-index:9999;left:0;top:0;transform:translateY(6px) scale(0.98);opacity:0;pointer-events:none}
-#word-tooltip.show{opacity:1;transform:translateY(0) scale(1);transition:opacity .16s ease, transform .16s cubic-bezier(.2,.9,.2,1)}
-#word-tooltip{background:linear-gradient(180deg,#ffffff,#fbfdff);border:1px solid rgba(2,6,23,0.06);box-shadow:0 10px 30px rgba(2,6,23,0.08);padding:12px 14px;border-radius:10px;max-width:360px}
-#word-tooltip .tooltip-grid { gap: .75rem }
+/* static tooltip placed inside the add-relation panel; hidden until shown */
+#word-tooltip{display:block;z-index:50;opacity:0;pointer-events:auto;max-width:100%}
+#word-tooltip.show{opacity:1;transition:opacity .12s ease}
+#word-tooltip{background:linear-gradient(180deg,#ffffff,#fbfdff);border:1px solid rgba(2,6,23,0.06);box-shadow:0 8px 18px rgba(2,6,23,0.06);padding:10px;border-radius:8px;margin-top:10px}
+#word-tooltip .tooltip-grid { gap: .5rem; display:grid; grid-template-columns: 1fr 1fr }
 #word-tooltip .tooltip-col { padding-right:6px }
 #word-tooltip h4{font-size:.85rem;margin:0 0 .25rem 0;color:var(--muted)}
 #word-tooltip ul{margin:0;padding-left:1rem}
 #word-tooltip li{font-size:.95rem;margin-bottom:.25rem}
-/* small arrow */
-#word-tooltip::after{content:'';position:absolute;width:10px;height:10px;background:inherit;border-left:1px solid rgba(2,6,23,0.06);transform:rotate(45deg);left:8px;top:50%}
 /* chapter view */
 .verse-words { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; padding: 0; margin: 0 }
 .verse-words li { list-style: none; display: inline-flex }
