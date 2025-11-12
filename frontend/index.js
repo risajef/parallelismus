@@ -1,6 +1,10 @@
 // Moved from inline script in index.html
 import * as api from '/static/app.js';
+import { createOption, setOptions, escapeHtml, sampleRandom } from '/static/dom-utils.js';
+import { makeStaticTooltip, buildTranslationGrid, buildShortcutHtml } from '/static/tooltip.js';
+import { installShortcuts } from '/static/keyboard.js';
 
+// DOM references
 const booksEl = document.getElementById('books');
 const chaptersEl = document.getElementById('chapters');
 const versesEl = document.getElementById('verses');
@@ -9,6 +13,8 @@ const resultEl = document.getElementById('result');
 const nextChapterBtn = document.getElementById('next-chapter');
 const nextVerseBtn = document.getElementById('next-verse');
 
+// (createOption, setOptions, escapeHtml, sampleRandom are imported from dom-utils.js)
+
 // Keep the most-recently-loaded chapters/verses in memory so the dropdowns can use
 // ordinal numbers (chapter.number / verse.number) as option values while we map
 // those numbers to DB ids when performing API calls.
@@ -16,14 +22,22 @@ let currentChapters = [];
 let currentVerses = [];
 
 async function loadBooks(){
-  const books = await api.fetchBooks();
-  booksEl.innerHTML = '';
-  books.forEach(b => {
-    const opt = document.createElement('option');
-    opt.value = b.id; opt.textContent = b.name;
-    booksEl.appendChild(opt);
-  });
-  if(books[0]) loadChapters(books[0].id);
+  console.log('loadBooks: fetching books...');
+  try {
+    const books = await api.fetchBooks();
+    booksEl.innerHTML = '';
+    books.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id; opt.textContent = b.name;
+      booksEl.appendChild(opt);
+    });
+    if(books[0]) loadChapters(books[0].id);
+    return;
+  } catch (err) {
+    console.error('loadBooks failed', err);
+    if (resultEl) resultEl.textContent = 'Failed to load books: ' + String(err);
+    throw err;
+  }
 }
 
 // When the selected book changes we must reload chapters (and verses/words).
@@ -36,138 +50,35 @@ booksEl.addEventListener('change', async () => {
   if (firstChap) history.pushState({}, '', `/chapter/${firstChap.id}`);
 });
 
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/[&<>\"]+/g, function(s) {
-    switch (s) {
-      case '&': return '&amp;';
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '"': return '&quot;';
-      default: return '';
-    }
-  });
-}
 
-// Transliteration helpers: detect Greek or Hebrew script and produce a
-// simple ASCII-friendly transliteration. This is intentionally lightweight
-// (no external libs) and should be good enough to help read words like
-// λογὸν -> logos or עֶלְיוֹן -> elyon.
-function removeCombiningMarks(s) {
+// Use transliteration provided by the shared API module for consistency
+const transliterate = api.transliterate;
+
+// sampleRandom is imported from dom-utils.js
+
+// Global error handlers to surface runtime issues during development
+window.addEventListener('error', (ev) => {
   try {
-    return s.normalize('NFD').replace(/\p{M}/gu, '');
-  } catch (e) {
-    return s;
-  }
-}
-
-function transliterateGreek(s) {
-  if (!s) return '';
-  // remove combining marks (accents, breathing)
-  let t = removeCombiningMarks(s.toLowerCase());
-  const map = {
-    'α':'a','β':'b','γ':'g','δ':'d','ε':'e','ζ':'z','η':'e','θ':'th','ι':'i','κ':'k',
-    'λ':'l','μ':'m','ν':'n','ξ':'x','ο':'o','π':'p','ρ':'r','σ':'s','ς':'s','τ':'t',
-    'υ':'u','φ':'ph','χ':'ch','ψ':'ps','ω':'o'
-  };
-  let out = '';
-  for (const ch of t) {
-    out += (map[ch] !== undefined) ? map[ch] : (/[a-z0-9]/.test(ch) ? ch : '');
-  }
-  // common cleanups
-  out = out.replace(/uu/g, 'u').replace(/phh/g, 'ph');
-  return out;
-}
-
-function transliterateHebrew(s) {
-  if (!s) return '';
-  // decompose so base letters and niqqud are separate
-  const decomp = s.normalize('NFD');
-  const letterMap = {
-    '\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v',
-    '\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k',
-    '\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'',
-    '\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r',
-    '\u05E9':'sh','\u05EA':'t'
-  };
-  const vowelMap = {
-    '\u05B0':'e','\u05B1':'e','\u05B2':'a','\u05B3':'a','\u05B4':'i','\u05B5':'e',
-    '\u05B6':'e','\u05B7':'a','\u05B8':'a','\u05B9':'o','\u05BB':'u','\u05C7':'o'
-  };
-  const SHIN_DOT = '\u05C1';
-  const SIN_DOT = '\u05C2';
-
-  const outParts = [];
-  let lastBase = -1;
-  for (let i = 0; i < decomp.length; i++) {
-    const ch = decomp[i];
-    const cp = ch.codePointAt(0);
-    // Hebrew base letters U+05D0..U+05EA
-    if (cp >= 0x05D0 && cp <= 0x05EA) {
-      const mapped = (letterMap[ch] !== undefined) ? letterMap[ch] : '';
-      outParts.push(mapped);
-      lastBase = outParts.length - 1;
-      continue;
-    }
-    // vowels (niqqud)
-    if (vowelMap[ch]) {
-      if (lastBase >= 0) {
-        outParts[lastBase] = outParts[lastBase] + vowelMap[ch];
-      } else {
-        outParts.push(vowelMap[ch]);
-        lastBase = outParts.length - 1;
-      }
-      continue;
-    }
-    // shin/sin dot handling
-    if (ch === SIN_DOT) {
-      if (lastBase >= 0 && outParts[lastBase].endsWith('sh')) {
-        outParts[lastBase] = outParts[lastBase].slice(0, -2) + 's';
-      }
-      continue;
-    }
-    if (ch === SHIN_DOT) {
-      if (lastBase >= 0 && !outParts[lastBase].endsWith('h')) {
-        outParts[lastBase] = outParts[lastBase] + 'h';
-      }
-      continue;
-    }
-    // keep ASCII letters/numbers
-    if (/[A-Za-z0-9]/.test(ch)) {
-      outParts.push(ch);
-      lastBase = outParts.length - 1;
-    }
-  }
-  let out = outParts.join('');
-  out = out.replace(/''/g, "'").trim();
-  return out.toLowerCase();
-}
-
-function transliterate(s) {
-  if (!s) return '';
-  // quick detection for Greek or Hebrew characters
+    console.error('Unhandled error', ev.error || ev.message, ev);
+    const r = document.getElementById('result');
+    if (r) r.textContent = 'Runtime error: ' + String(ev.error || ev.message);
+  } catch (e) {}
+});
+window.addEventListener('unhandledrejection', (ev) => {
   try {
-    if (/\p{Script=Greek}/u.test(s)) return transliterateGreek(s);
-    if (/\p{Script=Hebrew}/u.test(s)) return transliterateHebrew(s);
-  } catch (e) {
-    // If Unicode property escapes aren't available, try simple ranges
-    if (/[\u0370-\u03FF]/.test(s)) return transliterateGreek(s);
-    if (/[\u0590-\u05FF]/.test(s)) return transliterateHebrew(s);
-  }
-  return '';
-}
+    console.error('Unhandled rejection', ev.reason);
+    const r = document.getElementById('result');
+    if (r) r.textContent = 'Unhandled promise rejection: ' + String(ev.reason);
+  } catch (e) {}
+});
 
-function sampleRandom(arr, n) {
-  if (!Array.isArray(arr)) return [];
-  const len = arr.length;
-  if (len <= n) return arr.slice();
-  const out = [];
-  const seen = new Set();
-  while (out.length < n) {
-    const i = Math.floor(Math.random() * len);
-    if (!seen.has(i)) { seen.add(i); out.push(arr[i]); }
-  }
-  return out;
+console.log('frontend/index.js initializing');
+
+// Defensive checks
+if (!booksEl || !chaptersEl || !versesEl || !wordsEl) {
+  console.error('Critical DOM element missing', { booksEl, chaptersEl, versesEl, wordsEl });
+  if (resultEl) resultEl.textContent = 'Frontend failed to initialize: missing DOM elements';
+  // stop further execution
 }
 
 async function loadChapters(bookId){
@@ -546,17 +457,8 @@ document.getElementById('showRelations').addEventListener('click', async ()=>{
   }
 });
 
-// Create a static tooltip container inside the add-relation panel
 const addRelPanel = document.getElementById('add-relation-panel');
-const tooltip = document.createElement('div');
-tooltip.id = 'word-tooltip';
-tooltip.style.pointerEvents = 'auto';
-tooltip.classList.add('static');
-// place it at the end of the panel so it appears below the form inputs
-if (addRelPanel) addRelPanel.appendChild(tooltip);
-// accessibility
-tooltip.setAttribute('role', 'status');
-tooltip.setAttribute('aria-live', 'polite');
+const tooltipApi = makeStaticTooltip(addRelPanel);
 
 let activeTarget = null;
 function handleMouseOver(ev) {
@@ -569,10 +471,8 @@ function handleMouseOver(ev) {
     try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
     const sampledTranslations = sampleRandom(translations, 10);
     const sampledOriginals = sampleRandom(originals, 10);
-    const leftList = sampledTranslations.length ? '<ul>' + sampledTranslations.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>' : '<div>-</div>';
-    const rightList = sampledOriginals.length ? '<ul>' + sampledOriginals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
-    tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
-    tooltip.classList.add('show');
+    const html = buildTranslationGrid(sampledTranslations, sampledOriginals, escapeHtml);
+    tooltipApi.show(html);
   }
 }
 function handleMouseOut(ev) {
@@ -583,48 +483,14 @@ function handleMouseOut(ev) {
   if (fromRoot && fromRoot === toRoot) return;
   if (fromRoot) {
     activeTarget = null;
-    tooltip.classList.remove('show');
+    tooltipApi.hide();
   }
 }
 document.body.addEventListener('mouseover', handleMouseOver);
 document.body.addEventListener('mouseout', handleMouseOut);
 
-// Shortcut info button behavior and keyboard shortcuts
-const shortcutBtn = document.getElementById('shortcutInfo');
-let showShortcuts = false;
-function buildShortcutHtml() {
-  return `<div style="margin-top:6px;font-size:.9rem;color:var(--muted)"><strong>Keyboard</strong><ul style="margin:6px 0 0 1rem;padding:0"><li>Alt+S — focus Source input</li><li>Alt+T — focus Target input</li><li>Alt+R — focus Relation type</li><li>Alt+Enter — Add Relation</li></ul></div>`;
-}
-if (shortcutBtn) {
-  shortcutBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    showShortcuts = !showShortcuts;
-    if (showShortcuts) {
-      tooltip.classList.add('show');
-      // append keyboard help to existing content (or show if empty)
-      tooltip.innerHTML = (tooltip.innerHTML || '<div>-</div>') + buildShortcutHtml();
-      shortcutBtn.setAttribute('aria-pressed', 'true');
-    } else {
-      tooltip.classList.remove('show');
-      shortcutBtn.setAttribute('aria-pressed', 'false');
-    }
-  });
-}
-
-// Keyboard shortcuts: Alt+S/T/R and Alt+Enter
-document.addEventListener('keydown', (ev) => {
-  if (!ev.altKey) return;
-  const code = ev.key.toLowerCase();
-  if (code === 's') {
-    ev.preventDefault(); document.getElementById('src')?.focus();
-  } else if (code === 't') {
-    ev.preventDefault(); document.getElementById('tgt')?.focus();
-  } else if (code === 'r') {
-    ev.preventDefault(); document.getElementById('type')?.focus();
-  } else if (ev.key === 'Enter') {
-    ev.preventDefault(); document.getElementById('addRel')?.click();
-  }
-});
+// install shortcuts with the keyboard module
+installShortcuts(document.getElementById('shortcutInfo'), tooltipApi, buildShortcutHtml);
 
 document.body.addEventListener('focusin', (ev) => {
   const target = ev.target;
