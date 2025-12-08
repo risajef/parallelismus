@@ -173,6 +173,59 @@ def relations_counts(ids: str):
         return out
 
 
+@app.get("/relations/all")
+def relations_all(limit: int = 500, relation_type: str | None = None):
+    """Return a list of relations with basic labels for graph visualization."""
+    from sqlmodel import Session
+    from .models import Word
+
+    with Session(engine) as session:
+        stmt = select(Relation)
+        if relation_type:
+            stmt = stmt.where(Relation.relation_type == relation_type)
+        stmt = stmt.order_by(Relation.id)
+        if limit:
+            stmt = stmt.limit(limit)
+        relations = session.exec(stmt).all()
+        if not relations:
+            return []
+        ids: set[str] = set()
+        for rel in relations:
+            if rel.source_id:
+                ids.add(rel.source_id)
+            if rel.target_id:
+                ids.add(rel.target_id)
+        word_map: dict[str, Word] = {}
+        if ids:
+            words = session.exec(select(Word).where(Word.strong.in_(list(ids)))).all()  # type: ignore[attr-defined]
+            for w in words:
+                word_map[w.strong] = w
+
+        def build_label(word: Word | None, fallback: str) -> str:
+            if not word:
+                return fallback
+            primary = None
+            if isinstance(word.translation, list) and word.translation:
+                primary = word.translation[0]
+            elif isinstance(word.original, list) and word.original:
+                primary = word.original[0]
+            if primary:
+                return f"{fallback} — {primary}"
+            return fallback
+
+        response = []
+        for rel in relations:
+            response.append({
+                "id": rel.id,
+                "source_id": rel.source_id,
+                "target_id": rel.target_id,
+                "relation_type": rel.relation_type,
+                "source_label": build_label(word_map.get(rel.source_id), rel.source_id or ""),
+                "target_label": build_label(word_map.get(rel.target_id), rel.target_id or ""),
+            })
+        return response
+
+
 @app.get("/words/{strong}/detail", response_model=WordDetail)
 def get_word_detail(strong: str):
     """Return word variants and list of usages (which verse/chapter/book and the verse-canonical original/translation)."""
@@ -269,6 +322,12 @@ def strong_search(q: str, request: Request):
 def strong_page(strong: str):
     # serves a small frontend page that shows information about a strong and its relations
     return FileResponse("frontend/strong.html")
+
+
+@app.get("/graph", include_in_schema=False)
+def relations_graph_page():
+    """Serve the interactive relations graph frontend."""
+    return FileResponse("frontend/graph.html")
 
 
 @app.get("/book/{book_id}/chapter/{chapter_id}", include_in_schema=False)
