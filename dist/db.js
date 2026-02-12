@@ -91,12 +91,36 @@ function countStore(db, storeName) {
     });
 }
 
+// ── Clear all object stores ──────────────────────────────────────────────────
+function clearStore(db, storeName) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 // ── Seed bible data if empty ────────────────────────────────────────────────
 async function seedIfNeeded(db, onProgress) {
+    // Check the LAST table that gets loaded — if it's populated, everything is complete.
+    // Previous versions only checked books, so a partial load (books+chapters+verses
+    // but no words/verseWords) would never be repaired.
     const booksCount = await countStore(db, 'books');
-    if (booksCount > 0) {
+    const vwCount = await countStore(db, 'verseWords');
+    const wordsCount = await countStore(db, 'words');
+
+    if (booksCount > 0 && vwCount > 0 && wordsCount > 0) {
         if (onProgress) onProgress('Database already loaded.');
         return;
+    }
+
+    // Incomplete data from a previous failed load — wipe everything first
+    if (booksCount > 0 || vwCount > 0 || wordsCount > 0) {
+        if (onProgress) onProgress('Incomplete database detected, re-downloading…');
+        for (const store of ['books', 'chapters', 'verses', 'words', 'verseWords']) {
+            await clearStore(db, store);
+        }
     }
 
     if (onProgress) onProgress('Downloading bible data…');
