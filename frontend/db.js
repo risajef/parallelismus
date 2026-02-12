@@ -12,6 +12,10 @@ const DB_VERSION = 1;
 // when embedded on a page at a different path.
 const _scriptBase = (function() {
     try {
+        // When loaded via the embed script, it sets a global base URL
+        if (window.__PARALLELISMUS_BASE__) {
+            return window.__PARALLELISMUS_BASE__;
+        }
         // When loaded as a standalone script, document.currentScript is available
         if (document.currentScript && document.currentScript.src) {
             return new URL('./', document.currentScript.src).href;
