@@ -177,18 +177,42 @@ function compileScss() {
 // ── 4. Bundle JavaScript files ───────────────────────────────────────────────
 async function bundleJs() {
     console.log('Bundling JavaScript…');
-    
-    // Bundle main index.js
-    await esbuild.build({
-        entryPoints: [path.join(FRONTEND_DIR, 'index.static.js')],
+
+    // The static JS files import from './app.js', but in the source directory
+    // app.js is the backend (fetch-based) version. The static (IndexedDB) version
+    // is app.static.js. We use an esbuild plugin to redirect the import.
+    const aliasPlugin = {
+        name: 'static-alias',
+        setup(build) {
+            // Intercept any resolve of 'app.js' and point it to 'app.static.js'
+            build.onResolve({ filter: /app\.js$/ }, (args) => {
+                if (args.importer && args.kind === 'import-statement') {
+                    const resolved = path.join(path.dirname(args.importer), 'app.static.js');
+                    if (fs.existsSync(resolved)) {
+                        return { path: resolved };
+                    }
+                }
+                return null;
+            });
+        },
+    };
+
+    const commonOptions = {
         bundle: true,
         format: 'iife',
-        outfile: path.join(DIST_DIR, 'index.js'),
         minify: true,
         sourcemap: false,
+        plugins: [aliasPlugin],
+    };
+
+    // Bundle main index.js
+    await esbuild.build({
+        ...commonOptions,
+        entryPoints: [path.join(FRONTEND_DIR, 'index.static.js')],
+        outfile: path.join(DIST_DIR, 'index.js'),
     });
     console.log('  index.js bundled');
-    
+
     // Bundle other pages if they exist
     const pagesToBundle = ['strong_search.static.js', 'graph.static.js'];
     for (const page of pagesToBundle) {
@@ -196,12 +220,9 @@ async function bundleJs() {
         if (fs.existsSync(entryPath)) {
             const outName = page.replace('.static.js', '.js');
             await esbuild.build({
+                ...commonOptions,
                 entryPoints: [entryPath],
-                bundle: true,
-                format: 'iife',
                 outfile: path.join(DIST_DIR, outName),
-                minify: true,
-                sourcemap: false,
             });
             console.log(`  ${outName} bundled`);
         }
