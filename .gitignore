@@ -1,6 +1,5 @@
 *.db
 __pycache__/
-bible/
 *.db-journal
 *.7z
 *.sql
@@ -8,3 +7,4 @@ bible/
 node_modules/
 package-lock.json
 styles.css
+dist/

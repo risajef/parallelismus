@@ -7,6 +7,8 @@
   },
   "scripts": {
     "build:css": "sass frontend/styles.scss frontend/styles.css --no-source-map --style=expanded",
-    "watch:css": "sass --watch frontend/styles.scss:frontend/styles.css --style=expanded"
+    "watch:css": "sass --watch frontend/styles.scss:frontend/styles.css --style=expanded",
+    "build": "node build.js",
+    "serve": "npx serve dist -l 3000"
   }
 }

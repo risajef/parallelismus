@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Parallelismus</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Parallelismus</h1>
+        <nav style="display:flex;gap:10px;margin-left:auto;font-size:.9rem">
+          <a href="strong_search.html">Search Strong</a>
+          <a href="graph.html">Graph</a>
+        </nav>
+      </header>
+
+      <div id="loading-status" style="padding:12px;text-align:center;color:#6b7280">Initialising database…</div>
+
+      <div class="app-shell">
+        <div class="main-column">
+          <div class="card controls">
+            <label>Book: <select id="books"></select></label>
+            <label>Chapter: <select id="chapters"></select></label>
+            <button id="next-chapter" title="Go to next chapter">Next ▶</button>
+            <label>Verse: <select id="verses"></select></label>
+            <button id="next-verse" title="Go to next verse">Next ▶</button>
+          </div>
+
+          <div class="card words">
+            <ul id="words"></ul>
+          </div>
+        </div>
+
+        <aside class="side-column">
+          <div class="card" id="relations-panel">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <input id="relations-strong" placeholder="strong id" style="flex:1" />
+              <button id="showRelations">Show Relations</button>
+            </div>
+            <div id="relations-list"></div>
+          </div>
+
+          <div class="card" id="add-relation-panel">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <input id="src" placeholder="source strong" />
+              <input id="tgt" placeholder="target strong" />
+              <input id="type" list="relation-types" placeholder="relation type" />
+              <datalist id="relation-types"></datalist>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button id="addRel">Add Relation</button>
+                <button id="shortcutInfo" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">ℹ️</button>
+              </div>
+              <div id="result" style="margin-top:8px;color:#111"></div>
+            </div>
+          </div>
+
+          <div class="card" id="data-panel">
+            <h4 style="margin:0 0 8px 0;font-size:.9rem;color:#6b7280">Data Management</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="exportRelations" title="Download relations as JSON">⬇ Export Relations</button>
+              <button id="importRelations" title="Load relations from a JSON file">⬆ Import Relations</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
