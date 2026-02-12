@@ -7,7 +7,20 @@
 
 const DB_NAME = 'parallelismus';
 const DB_VERSION = 1;
-const DATA_URL = 'data/bible.json';
+
+// Resolve DATA_URL relative to the script's own location so it works
+// when embedded on a page at a different path.
+const _scriptBase = (function() {
+    try {
+        // When loaded as a standalone script, document.currentScript is available
+        if (document.currentScript && document.currentScript.src) {
+            return new URL('./', document.currentScript.src).href;
+        }
+    } catch (e) { /* ignore */ }
+    // Fallback: resolve relative to page URL
+    return '';
+})();
+const DATA_URL = _scriptBase + 'data/bible.json';
 
 let _db = null;
 let _initPromise = null;
