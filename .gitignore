@@ -7,4 +7,5 @@ __pycache__/
 node_modules/
 package-lock.json
 styles.css
-dist/
+README.md
+Description.md
