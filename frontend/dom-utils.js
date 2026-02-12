@@ -10,7 +10,7 @@ export function setOptions(selectEl, items, valueKey, labelKey) {
 }
 export function escapeHtml(str) {
   if (str == null) return '';
-  return String(str).replace(/[&<>\"]+/g, function(s) {
+  return String(str).replace(/[&<>\"]+/g, function (s) {
     switch (s) {
       case '&': return '&amp;';
       case '<': return '&lt;';

@@ -1,123 +1,208 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
     <title>Strong definition</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
     <style>
-      :root{--bg:#f7fafc;--card:#fff;--muted:#6b7280;--accent:#2563eb;--radius:10px;--shadow:0 6px 18px rgba(15,23,42,0.06)}
-      body{font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;background:var(--bg);margin:0;color:#0f172a}
-      .wrap{max-width:900px;margin:28px auto;padding:20px}
-      .card{background:var(--card);padding:16px;border-radius:var(--radius);box-shadow:var(--shadow)}
-      a{color:var(--accent)}
+      :root {
+        --bg: #f7fafc;
+        --card: #fff;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --radius: 10px;
+        --shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+      }
+      body {
+        font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+        background: var(--bg);
+        margin: 0;
+        color: #0f172a;
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 28px auto;
+        padding: 20px;
+      }
+      .card {
+        background: var(--card);
+        padding: 16px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+      a {
+        color: var(--accent);
+      }
     </style>
   </head>
   <body>
     <div class="wrap card">
-      <p><a href="index.html">← Back to app</a> | <a href="strong_search.html">Search</a></p>
+      <p>
+        <a href="index.html">← Back to app</a> |
+        <a href="strong_search.html">Search</a>
+      </p>
       <h1 id="strong-id">Strong</h1>
-      <div id="loading-status" style="padding:8px;color:#6b7280">Initialising…</div>
+      <div id="loading-status" style="padding: 8px; color: #6b7280">
+        Initialising…
+      </div>
       <div id="variants"></div>
-      <div id="usages" style="margin-top:12px"></div>
-      <div id="relations" style="margin-top:12px"></div>
+      <div id="usages" style="margin-top: 12px"></div>
+      <div id="relations" style="margin-top: 12px"></div>
     </div>
     <script type="module">
-      import * as api from './app.js';
-      import { transliterate } from './app.js';
+      import * as api from './app.js'
+      import { transliterate } from './app.js'
 
-      const loadingEl = document.getElementById('loading-status');
-      const strong = location.hash.replace(/^#/, '') || 'unknown';
-      document.getElementById('strong-id').textContent = strong;
+      const loadingEl = document.getElementById('loading-status')
+      const strong = location.hash.replace(/^#/, '') || 'unknown'
+      document.getElementById('strong-id').textContent = strong
 
-      (async () => {
+      ;(async () => {
         try {
-          await api.initDB((msg) => { if (loadingEl) loadingEl.textContent = msg; });
-          if (loadingEl) loadingEl.style.display = 'none';
-          await load();
+          await api.initDB(msg => {
+            if (loadingEl) loadingEl.textContent = msg
+          })
+          if (loadingEl) loadingEl.style.display = 'none'
+          await load()
         } catch (err) {
-          if (loadingEl) loadingEl.textContent = 'DB init failed: ' + String(err);
+          if (loadingEl)
+            loadingEl.textContent = 'DB init failed: ' + String(err)
         }
-      })();
+      })()
 
       async function load() {
         const [detail, rels] = await Promise.allSettled([
           api.fetchWordDetail(strong),
           api.fetchRelations(strong)
-        ]);
-        const vEl = document.getElementById('variants');
+        ])
+        const vEl = document.getElementById('variants')
         if (detail.status === 'fulfilled') {
-          const d = detail.value;
-          vEl.innerHTML = '<h3>Variants</h3>';
-          vEl.innerHTML += '<strong>All translations:</strong> <ul>' + d.all_translations.map(t => '<li>' + t + '</li>').join('') + '</ul>';
-          vEl.innerHTML += '<strong>All originals (with transliteration):</strong> <ul>' + d.all_originals.map(o => {
-            const tr = transliterate(o || '');
-            return '<li>' + o + (tr ? ' — <em style="font-style:italic;color:#6b7280;margin-left:6px">' + tr + '</em>' : '') + '</li>';
-          }).join('') + '</ul>';
+          const d = detail.value
+          vEl.innerHTML = '<h3>Variants</h3>'
+          vEl.innerHTML +=
+            '<strong>All translations:</strong> <ul>' +
+            d.all_translations.map(t => '<li>' + t + '</li>').join('') +
+            '</ul>'
+          vEl.innerHTML +=
+            '<strong>All originals (with transliteration):</strong> <ul>' +
+            d.all_originals
+              .map(o => {
+                const tr = transliterate(o || '')
+                return (
+                  '<li>' +
+                  o +
+                  (tr
+                    ? ' — <em style="font-style:italic;color:#6b7280;margin-left:6px">' +
+                      tr +
+                      '</em>'
+                    : '') +
+                  '</li>'
+                )
+              })
+              .join('') +
+            '</ul>'
 
-          const uEl = document.getElementById('usages');
-          uEl.innerHTML = '<h3>Usages</h3>';
+          const uEl = document.getElementById('usages')
+          uEl.innerHTML = '<h3>Usages</h3>'
           if (d.usages && d.usages.length) {
-            const list = document.createElement('ul');
+            const list = document.createElement('ul')
             d.usages.forEach(u => {
-              const li = document.createElement('li');
-              const a = document.createElement('a');
-              a.href = 'index.html#/book/' + u.book_id + '/chapter/' + u.chapter_id + '/verse/' + u.verse_id;
-              a.textContent = u.book_name + ' ' + u.chapter_number + ':' + u.verse_number + ' — ' + (u.verse_translation || u.verse_original || '');
-              a.target = '_blank';
-              li.appendChild(a);
-              list.appendChild(li);
-            });
-            uEl.appendChild(list);
+              const li = document.createElement('li')
+              const a = document.createElement('a')
+              a.href =
+                'index.html#/book/' +
+                u.book_id +
+                '/chapter/' +
+                u.chapter_id +
+                '/verse/' +
+                u.verse_id
+              a.textContent =
+                u.book_name +
+                ' ' +
+                u.chapter_number +
+                ':' +
+                u.verse_number +
+                ' — ' +
+                (u.verse_translation || u.verse_original || '')
+              a.target = '_blank'
+              li.appendChild(a)
+              list.appendChild(li)
+            })
+            uEl.appendChild(list)
           } else {
-            uEl.innerHTML += '<div>(no usages found)</div>';
+            uEl.innerHTML += '<div>(no usages found)</div>'
           }
         } else {
-          vEl.innerHTML = '<div>Failed to load detail: ' + String(detail.reason) + '</div>';
+          vEl.innerHTML =
+            '<div>Failed to load detail: ' + String(detail.reason) + '</div>'
         }
 
-        const rEl = document.getElementById('relations');
+        const rEl = document.getElementById('relations')
         if (rels.status === 'fulfilled') {
-          rEl.innerHTML = '<h3>Relations</h3>';
-          const relList = document.createElement('ul');
-          relList.style.listStyle = 'none';
-          relList.style.padding = '0';
-          const usageMap = {};
-          if (detail.status === 'fulfilled' && detail.value && Array.isArray(detail.value.usages)) {
+          rEl.innerHTML = '<h3>Relations</h3>'
+          const relList = document.createElement('ul')
+          relList.style.listStyle = 'none'
+          relList.style.padding = '0'
+          const usageMap = {}
+          if (
+            detail.status === 'fulfilled' &&
+            detail.value &&
+            Array.isArray(detail.value.usages)
+          ) {
             for (const u of detail.value.usages) {
-              if (u && u.verse_id != null) usageMap[String(u.verse_id)] = u;
+              if (u && u.verse_id != null) usageMap[String(u.verse_id)] = u
             }
           }
           rels.value.forEach(r => {
-            const li = document.createElement('li');
-            const srcLink = document.createElement('a');
-            srcLink.href = 'strong.html#' + encodeURIComponent(r.source_id);
-            srcLink.textContent = r.source_id;
-            srcLink.target = '_blank';
-            const tgtLink = document.createElement('a');
-            tgtLink.href = 'strong.html#' + encodeURIComponent(r.target_id);
-            tgtLink.textContent = r.target_id;
-            tgtLink.target = '_blank';
-            li.appendChild(srcLink);
-            li.appendChild(document.createTextNode(' → ' + r.relation_type + ' → '));
-            li.appendChild(tgtLink);
+            const li = document.createElement('li')
+            const srcLink = document.createElement('a')
+            srcLink.href = 'strong.html#' + encodeURIComponent(r.source_id)
+            srcLink.textContent = r.source_id
+            srcLink.target = '_blank'
+            const tgtLink = document.createElement('a')
+            tgtLink.href = 'strong.html#' + encodeURIComponent(r.target_id)
+            tgtLink.textContent = r.target_id
+            tgtLink.target = '_blank'
+            li.appendChild(srcLink)
+            li.appendChild(
+              document.createTextNode(' → ' + r.relation_type + ' → ')
+            )
+            li.appendChild(tgtLink)
             if (r.source_verse_id) {
-              const key = String(r.source_verse_id);
+              const key = String(r.source_verse_id)
               if (usageMap[key]) {
-                const u = usageMap[key];
-                const sv = document.createElement('a');
-                sv.href = 'index.html#/book/' + u.book_id + '/chapter/' + u.chapter_id + '/verse/' + u.verse_id;
-                sv.textContent = ' (Source: ' + u.book_name + ' ' + u.chapter_number + ':' + u.verse_number + ')';
-                sv.style.marginLeft = '8px';
-                sv.target = '_blank';
-                li.appendChild(sv);
+                const u = usageMap[key]
+                const sv = document.createElement('a')
+                sv.href =
+                  'index.html#/book/' +
+                  u.book_id +
+                  '/chapter/' +
+                  u.chapter_id +
+                  '/verse/' +
+                  u.verse_id
+                sv.textContent =
+                  ' (Source: ' +
+                  u.book_name +
+                  ' ' +
+                  u.chapter_number +
+                  ':' +
+                  u.verse_number +
+                  ')'
+                sv.style.marginLeft = '8px'
+                sv.target = '_blank'
+                li.appendChild(sv)
               }
             }
-            relList.appendChild(li);
-          });
-          rEl.appendChild(relList);
+            relList.appendChild(li)
+          })
+          rEl.appendChild(relList)
         } else {
-          rEl.innerHTML = '<div>Failed to load relations: ' + String(rels.reason) + '</div>';
+          rEl.innerHTML =
+            '<div>Failed to load relations: ' + String(rels.reason) + '</div>'
         }
       }
     </script>

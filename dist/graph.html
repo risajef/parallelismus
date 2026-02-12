@@ -1,43 +1,92 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Relations Graph</title>
-    <link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
     <style>
       body {
         background: #0f172a;
         color: #e2e8f0;
         margin: 0;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+          'Segoe UI', sans-serif;
       }
-      .graph-shell { max-width: 1200px; margin: 0 auto; padding: 20px; }
+      .graph-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
       .graph-controls {
-        display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 12px;
       }
-      .graph-controls label { display: flex; flex-direction: column; font-size: 0.85rem; color: #cbd5f5; }
-      .graph-controls input, .graph-controls select {
-        padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.4);
-        background: #1e293b; color: #f8fafc;
+      .graph-controls label {
+        display: flex;
+        flex-direction: column;
+        font-size: 0.85rem;
+        color: #cbd5f5;
+      }
+      .graph-controls input,
+      .graph-controls select {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: #1e293b;
+        color: #f8fafc;
       }
       .graph-controls button {
-        padding: 10px 16px; border-radius: 10px; border: none; background: #38bdf8;
-        color: #0f172a; font-weight: 600; cursor: pointer;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: none;
+        background: #38bdf8;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
       }
-      #graph { height: 700px; border-radius: 14px; background: #0f172a; border: 1px solid rgba(148,163,184,0.4); }
-      #graph-status { margin-top: 8px; font-size: 0.85rem; color: #94a3b8; }
+      #graph {
+        height: 700px;
+        border-radius: 14px;
+        background: #0f172a;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+      #graph-status {
+        margin-top: 8px;
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
     </style>
   </head>
   <body>
     <div class="graph-shell">
-      <h1 style="margin-top:0;color:#fef3c7">Relations Graph</h1>
-      <div id="loading-status" style="padding:8px;color:#94a3b8">Initialising…</div>
+      <h1 style="margin-top: 0; color: #fef3c7">Relations Graph</h1>
+      <div id="loading-status" style="padding: 8px; color: #94a3b8">
+        Initialising…
+      </div>
       <div class="graph-controls">
-        <label>Relation type <input id="relationType" placeholder="(optional)" /></label>
-        <label>Max edges <input id="limit" type="number" min="50" max="2000" step="50" value="500" /></label>
-        <label>Layout
+        <label
+          >Relation type <input id="relationType" placeholder="(optional)"
+        /></label>
+        <label
+          >Max edges
+          <input
+            id="limit"
+            type="number"
+            min="50"
+            max="2000"
+            step="50"
+            value="500"
+        /></label>
+        <label
+          >Layout
           <select id="layout">
             <option value="spring">Spring</option>
             <option value="kamada_kawai">Kamada-Kawai</option>
@@ -45,7 +94,12 @@
           </select>
         </label>
         <button id="refresh">Load graph</button>
-        <button onclick="window.location='index.html'" style="background:#facc15;color:#111827">Back to app</button>
+        <button
+          onclick="window.location='index.html'"
+          style="background: #facc15; color: #111827"
+        >
+          Back to app
+        </button>
       </div>
       <div id="graph"></div>
       <div id="graph-status"></div>

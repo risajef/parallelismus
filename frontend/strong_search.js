@@ -4,7 +4,7 @@ const qEl = document.getElementById('q');
 const go = document.getElementById('go');
 const results = document.getElementById('results');
 
-async function doSearch(){
+async function doSearch() {
   const q = (qEl.value || '').trim();
   if (!q) { results.innerHTML = '<div>Enter a query</div>'; return; }
   results.innerHTML = '<div>Searching…</div>';
@@ -22,10 +22,10 @@ async function doSearch(){
       strong.textContent = r.strong;
       li.appendChild(strong);
       const t = document.createElement('div');
-      t.innerHTML = `<strong>Translations:</strong> ${Array.isArray(r.translation) ? r.translation.slice(0,6).map(x=>escapeHtml(x)).join(', ') : ''}`;
+      t.innerHTML = `<strong>Translations:</strong> ${Array.isArray(r.translation) ? r.translation.slice(0, 6).map(x => escapeHtml(x)).join(', ') : ''}`;
       li.appendChild(t);
       const o = document.createElement('div');
-      o.innerHTML = `<strong>Originals:</strong> ${Array.isArray(r.original) ? r.original.slice(0,6).map(x=>escapeHtml(x)).join(', ') : ''}`;
+      o.innerHTML = `<strong>Originals:</strong> ${Array.isArray(r.original) ? r.original.slice(0, 6).map(x => escapeHtml(x)).join(', ') : ''}`;
       li.appendChild(o);
       // link to strong detail
       const a = document.createElement('a');
@@ -40,13 +40,13 @@ async function doSearch(){
     results.innerHTML = '';
     results.appendChild(out);
   } catch (err) {
-    results.innerHTML = '<div>Error: '+String(err)+'</div>';
+    results.innerHTML = '<div>Error: ' + String(err) + '</div>';
   }
 }
 
-function escapeHtml(s){ if (s==null) return ''; return String(s).replace(/[&<>\"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>\"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
 
-qEl.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') doSearch(); });
+qEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
 go.addEventListener('click', doSearch);
 
 // optionally prefill from query param

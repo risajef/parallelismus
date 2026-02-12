@@ -21,7 +21,7 @@ const nextVerseBtn = document.getElementById('next-verse');
 let currentChapters = [];
 let currentVerses = [];
 
-async function loadBooks(){
+async function loadBooks() {
   console.log('loadBooks: fetching books...');
   try {
     const books = await api.fetchBooks();
@@ -31,7 +31,7 @@ async function loadBooks(){
       opt.value = b.id; opt.textContent = b.name;
       booksEl.appendChild(opt);
     });
-    if(books[0]) loadChapters(books[0].id);
+    if (books[0]) loadChapters(books[0].id);
     return;
   } catch (err) {
     console.error('loadBooks failed', err);
@@ -62,14 +62,14 @@ window.addEventListener('error', (ev) => {
     console.error('Unhandled error', ev.error || ev.message, ev);
     const r = document.getElementById('result');
     if (r) r.textContent = 'Runtime error: ' + String(ev.error || ev.message);
-  } catch (e) {}
+  } catch (e) { }
 });
 window.addEventListener('unhandledrejection', (ev) => {
   try {
     console.error('Unhandled rejection', ev.reason);
     const r = document.getElementById('result');
     if (r) r.textContent = 'Unhandled promise rejection: ' + String(ev.reason);
-  } catch (e) {}
+  } catch (e) { }
 });
 
 console.log('frontend/index.js initializing');
@@ -81,7 +81,7 @@ if (!booksEl || !chaptersEl || !versesEl || !wordsEl) {
   // stop further execution
 }
 
-async function loadChapters(bookId){
+async function loadChapters(bookId) {
   const chapters = await api.fetchChapters(bookId);
   currentChapters = Array.isArray(chapters) ? chapters : [];
   chaptersEl.innerHTML = '';
@@ -96,7 +96,7 @@ async function loadChapters(bookId){
   if (currentChapters[0]) await loadVerses(currentChapters[0].id);
 }
 
-async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChapter: false }){
+async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChapter: false }) {
   const verses = await api.fetchVerses(chapterId);
   currentVerses = Array.isArray(verses) ? verses : [];
   versesEl.innerHTML = '';
@@ -166,7 +166,7 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
         box.tabIndex = 0;
         box.setAttribute('draggable', 'true');
         box.addEventListener('dragstart', (e) => {
-          try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) {}
+          try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) { }
           box.dataset.draggedAt = String(Date.now());
           box.classList.add('dragging');
         });
@@ -224,13 +224,13 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
     }));
     return;
   }
-  if(currentVerses[0]) await loadWords(currentVerses[0].id);
+  if (currentVerses[0]) await loadWords(currentVerses[0].id);
 }
 
-async function loadWords(verseId){
+async function loadWords(verseId) {
   const words = await api.fetchWords(verseId);
   wordsEl.innerHTML = '';
-    words.forEach(w => {
+  words.forEach(w => {
     const li = document.createElement('li');
     const canonicalOriginal = w.verse_original || '';
     const canonicalTranslation = w.verse_translation || '';
@@ -244,13 +244,13 @@ async function loadWords(verseId){
     bottom.className = 'word-original';
     bottom.textContent = canonicalOriginal || (canonicalTranslation ? '' : w.strong || '(no text)');
     // transliteration (greek/hebrew) 
-      const translit = transliterate(canonicalOriginal || '');
-      if (translit) {
-        const tEl = document.createElement('div');
-        tEl.className = 'word-translit';
-        tEl.textContent = translit;
-        box.appendChild(tEl);
-      }
+    const translit = transliterate(canonicalOriginal || '');
+    if (translit) {
+      const tEl = document.createElement('div');
+      tEl.className = 'word-translit';
+      tEl.textContent = translit;
+      box.appendChild(tEl);
+    }
     const allOriginals = Array.isArray(w.all_originals) ? w.all_originals : [];
     const allTranslations = Array.isArray(w.all_translations) ? w.all_translations : [];
     box.dataset.allOriginals = JSON.stringify(allOriginals);
@@ -278,7 +278,7 @@ async function loadWords(verseId){
     });
     box.setAttribute('draggable', 'true');
     box.addEventListener('dragstart', (e) => {
-      try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) {}
+      try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) { }
       box.dataset.draggedAt = String(Date.now());
       box.classList.add('dragging');
     });
@@ -293,13 +293,13 @@ async function loadWords(verseId){
     li.appendChild(box);
     wordsEl.appendChild(li);
   });
-    // mark words that have relations (call once for this verse)
-    try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { /* ignore marking errors */ }
+  // mark words that have relations (call once for this verse)
+  try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { /* ignore marking errors */ }
 }
 
 // Given an array of strong ids, query the backend for relations for each and mark
 // the corresponding word-box elements with a CSS class when any relation exists.
-async function markWordsWithRelations(strongIds){
+async function markWordsWithRelations(strongIds) {
   if (!Array.isArray(strongIds) || strongIds.length === 0) return;
   // Use a single batch request to determine which ids have relations
   try {
@@ -307,8 +307,8 @@ async function markWordsWithRelations(strongIds){
     console.debug('relationsBatch result', map);
     // Try counts if available to show badges
     let counts = {};
-    try { counts = await api.fetchRelationsCounts(strongIds).catch(()=>({})); } catch(e) { counts = {}; }
-    for (const id of strongIds){
+    try { counts = await api.fetchRelationsCounts(strongIds).catch(() => ({})); } catch (e) { counts = {}; }
+    for (const id of strongIds) {
       let has = false;
       if (Object.prototype.hasOwnProperty.call(map, id)) {
         has = !!map[id];
@@ -334,8 +334,8 @@ async function markWordsWithRelations(strongIds){
 const addPanel = document.getElementById('add-relation-panel');
 const relationsPanel = document.getElementById('relations-panel');
 
-function allowDrop(ev){ ev.preventDefault(); }
-function handleAddDrop(ev){
+function allowDrop(ev) { ev.preventDefault(); }
+function handleAddDrop(ev) {
   ev.preventDefault();
   const strong = ev.dataTransfer.getData('text/plain');
   if (!strong) return;
@@ -347,7 +347,7 @@ function handleAddDrop(ev){
     const inp = el && el.closest ? el.closest('input') : null;
     if (inp === tgtEl) { tgtEl.value = strong; handled = true; }
     else if (inp === srcEl) { srcEl.value = strong; handled = true; }
-  } catch (e) {}
+  } catch (e) { }
   if (!handled) {
     const active = document.activeElement;
     if (active === tgtEl || active === srcEl) {
@@ -357,17 +357,17 @@ function handleAddDrop(ev){
     }
   }
   addPanel.classList.add('drop-target');
-  setTimeout(()=>addPanel.classList.remove('drop-target'), 350);
+  setTimeout(() => addPanel.classList.remove('drop-target'), 350);
 }
 
-function handleRelationsDrop(ev){
+function handleRelationsDrop(ev) {
   ev.preventDefault();
   const strong = ev.dataTransfer.getData('text/plain');
   if (!strong) return;
   document.getElementById('relations-strong').value = strong;
   document.getElementById('showRelations').click();
   relationsPanel.classList.add('drop-target');
-  setTimeout(()=>relationsPanel.classList.remove('drop-target'), 350);
+  setTimeout(() => relationsPanel.classList.remove('drop-target'), 350);
 }
 
 addPanel.addEventListener('dragover', allowDrop);
@@ -375,7 +375,7 @@ addPanel.addEventListener('drop', handleAddDrop);
 relationsPanel.addEventListener('dragover', allowDrop);
 relationsPanel.addEventListener('drop', handleRelationsDrop);
 
-document.getElementById('showRelations').addEventListener('click', async ()=>{
+document.getElementById('showRelations').addEventListener('click', async () => {
   const strong = document.getElementById('relations-strong').value.trim();
   if (!strong) return;
   const groups = await api.fetchGroupedRelations(strong);
@@ -414,11 +414,11 @@ document.getElementById('showRelations').addEventListener('click', async ()=>{
         const btn = document.createElement('button');
         btn.textContent = `(Source: Link) ${vid}`;
         btn.style.marginRight = '6px';
-        btn.addEventListener('click', async ()=>{
+        btn.addEventListener('click', async () => {
           const verse = await api.fetchVerse(vid);
           const chap = await api.fetchChapter(verse.chapter_id);
           await loadChapters(chap.book_id);
-          setTimeout(async ()=>{
+          setTimeout(async () => {
             // chaptersEl uses ordinal numbers as values; find the chapter number for chap.id
             const chapEntry = currentChapters.find(c => Number(c.id) === Number(chap.id));
             if (chapEntry) {
@@ -437,7 +437,7 @@ document.getElementById('showRelations').addEventListener('click', async ()=>{
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
     removeBtn.style.marginLeft = '8px';
-    removeBtn.addEventListener('click', async ()=>{
+    removeBtn.addEventListener('click', async () => {
       if (!confirm('Remove this relation group? This will delete matching relations individually.')) return;
       try {
         const full = await api.fetchRelations(g.source_id);
@@ -467,8 +467,8 @@ function handleMouseOver(ev) {
     activeTarget = target;
     let originals = [];
     let translations = [];
-    try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch(e) {}
-    try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
+    try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch (e) { }
+    try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch (e) { }
     const sampledTranslations = sampleRandom(translations, 10);
     const sampledOriginals = sampleRandom(originals, 10);
     const html = buildTranslationGrid(sampledTranslations, sampledOriginals, escapeHtml);
@@ -497,12 +497,12 @@ document.body.addEventListener('focusin', (ev) => {
   if (target && target.classList && target.classList.contains('word-main')) {
     let originals = [];
     let translations = [];
-    try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch(e) {}
-    try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch(e) {}
+    try { originals = JSON.parse(target.dataset.allOriginals || '[]'); } catch (e) { }
+    try { translations = JSON.parse(target.dataset.allTranslations || '[]'); } catch (e) { }
     const leftList = translations.length ? '<ul>' + translations.map(t => `<li>${escapeHtml(t)}</li>`).join('') + '</ul>' : '<div>-</div>';
     const rightList = originals.length ? '<ul>' + originals.map(o => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>' : '<div>-</div>';
-  tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
-  tooltip.classList.add('show');
+    tooltip.innerHTML = `<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`;
+    tooltip.classList.add('show');
   }
 });
 document.body.addEventListener('focusout', (ev) => {
@@ -512,7 +512,7 @@ document.body.addEventListener('focusout', (ev) => {
   }
 });
 
-chaptersEl.addEventListener('change', async ()=> {
+chaptersEl.addEventListener('change', async () => {
   // chaptersEl.value holds the ordinal chapter.number; map to DB id via currentChapters
   const selectedNumber = Number(chaptersEl.value);
   const chap = currentChapters.find(c => Number(c.number) === selectedNumber);
@@ -523,7 +523,7 @@ chaptersEl.addEventListener('change', async ()=> {
 });
 
 // Advance to the next chapter (by ordinal) for the currently selected book
-async function goToNextChapter(){
+async function goToNextChapter() {
   const currentNumber = Number(chaptersEl.value) || 0;
   // find the chapter with the next higher ordinal
   const next = currentChapters.find(c => Number(c.number) === currentNumber + 1);
@@ -537,7 +537,7 @@ async function goToNextChapter(){
 }
 
 // Advance to the next verse (by ordinal) in the currently selected chapter
-async function goToNextVerse(){
+async function goToNextVerse() {
   const currentNumber = Number(versesEl.value) || 0;
   const next = currentVerses.find(v => Number(v.number) === currentNumber + 1);
   if (!next) return;
@@ -546,10 +546,10 @@ async function goToNextVerse(){
   history.pushState({}, '', `/verse/${next.id}`);
 }
 
-if (nextChapterBtn) nextChapterBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await goToNextChapter(); });
-if (nextVerseBtn) nextVerseBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await goToNextVerse(); });
+if (nextChapterBtn) nextChapterBtn.addEventListener('click', async (e) => { e.preventDefault(); await goToNextChapter(); });
+if (nextVerseBtn) nextVerseBtn.addEventListener('click', async (e) => { e.preventDefault(); await goToNextVerse(); });
 
-versesEl.addEventListener('change', async ()=> {
+versesEl.addEventListener('change', async () => {
   // versesEl.value holds the ordinal verse.number; map to DB id via currentVerses
   const selectedNumber = Number(versesEl.value);
   const verse = currentVerses.find(v => Number(v.number) === selectedNumber);
@@ -561,7 +561,7 @@ versesEl.addEventListener('change', async ()=> {
 
 window.addEventListener('popstate', (ev) => { initFromPath(); });
 
-document.getElementById('addRel').addEventListener('click', async ()=>{
+document.getElementById('addRel').addEventListener('click', async () => {
   const srcEl = document.getElementById('src');
   const tgtEl = document.getElementById('tgt');
   const typeEl = document.getElementById('type');
@@ -655,10 +655,10 @@ async function initFromPath() {
 }
 
 initFromPath();
-async function populateRelationTypes(){
+async function populateRelationTypes() {
   const types = await api.fetchRelationTypes();
   const data = document.getElementById('relation-types');
-  data.innerHTML = types.map(t=>`<option value="${t}"></option>`).join('');
+  data.innerHTML = types.map(t => `<option value="${t}"></option>`).join('');
 }
 populateRelationTypes();
 

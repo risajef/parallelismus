@@ -31,6 +31,11 @@ function slugToName(filename) {
 }
 
 // ── 1. Preprocess bible data ─────────────────────────────────────────────────
+// Produces:
+//   data/bible-index.json  — small (~200 KB): books, chapters, verses, words dict
+//   data/chapters/{id}.json — one per chapter (~2-20 KB): verse words for that chapter
+// This lets the browser load only the index on startup and fetch chapter data
+// on demand, eliminating the huge 44 MB upfront download and slow IndexedDB seeding.
 function preprocessBible() {
     console.log('Preprocessing bible data…');
     const files = fs.readdirSync(BIBLE_DIR).filter(f => f.endsWith('.json')).sort();
@@ -38,13 +43,14 @@ function preprocessBible() {
     const books = [];      // { id, name }
     const chapters = [];   // { id, book_id, number }
     const verses = [];     // { id, chapter_id, number }
-    const verseWords = []; // { id, verse_id, word_id, original, translation }
     const wordsMap = {};   // strong -> { strong, original: Set, translation: Set }
+
+    // Per-chapter verse-word data, keyed by chapterId
+    const chapterVerseWords = {}; // chapterId -> { verses: [ { id, number, words: [...] } ] }
 
     let bookId = 0;
     let chapterId = 0;
     let verseId = 0;
-    let vwId = 0;
 
     for (const file of files) {
         bookId++;
@@ -67,17 +73,22 @@ function preprocessBible() {
             chapters.push({ id: chapterId, book_id: bookId, number: chNum });
 
             const chVerses = byChapter[chNum];
+            const chapterData = { verses: [] };
+
             for (let vi = 0; vi < chVerses.length; vi++) {
                 verseId++;
                 verses.push({ id: verseId, chapter_id: chapterId, number: vi + 1 });
 
-                const words = chVerses[vi].verse;
-                if (!Array.isArray(words)) continue;
+                const verseData = { id: verseId, number: vi + 1, words: [] };
+                const rawWords = chVerses[vi].verse;
+                if (!Array.isArray(rawWords)) {
+                    chapterData.verses.push(verseData);
+                    continue;
+                }
 
-                // track which strong ids already appeared in this verse to avoid duplicate verseWord rows
                 const seenInVerse = new Set();
 
-                for (const w of words) {
+                for (const w of rawWords) {
                     if (!w || typeof w !== 'object') continue;
                     let strong = w.number;
                     if (typeof strong === 'string') strong = strong.trim();
@@ -86,27 +97,23 @@ function preprocessBible() {
                     const original = w.word || '';
                     const translation = w.text || '';
 
-                    // update global word
+                    // update global word dictionary
                     if (!wordsMap[strong]) {
                         wordsMap[strong] = { strong, original: new Set(), translation: new Set() };
                     }
                     if (original) wordsMap[strong].original.add(original);
                     if (translation) wordsMap[strong].translation.add(translation);
 
-                    // add verseWord link (one per verse+strong)
+                    // add word to verse (one per verse+strong)
                     if (!seenInVerse.has(strong)) {
                         seenInVerse.add(strong);
-                        vwId++;
-                        verseWords.push({
-                            id: vwId,
-                            verse_id: verseId,
-                            word_id: strong,
-                            original: original,
-                            translation: translation,
-                        });
+                        // Compact format: [strong, original, translation]
+                        verseData.words.push([strong, original, translation]);
                     }
                 }
+                chapterData.verses.push(verseData);
             }
+            chapterVerseWords[chapterId] = chapterData;
         }
     }
 
@@ -117,13 +124,27 @@ function preprocessBible() {
         translation: [...w.translation].sort(),
     }));
 
-    const data = { books, chapters, verses, verseWords, words };
-
+    // Write the small index file (books, chapters, verses metadata, words dictionary)
     ensureDir(DATA_DIR);
-    const outPath = path.join(DATA_DIR, 'bible.json');
-    fs.writeFileSync(outPath, JSON.stringify(data));
-    console.log(`  → ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(1)} MB)`);
-    console.log(`  ${books.length} books, ${chapters.length} chapters, ${verses.length} verses, ${words.length} words, ${verseWords.length} verseWords`);
+    const index = { books, chapters, verses, words };
+    const indexPath = path.join(DATA_DIR, 'bible-index.json');
+    fs.writeFileSync(indexPath, JSON.stringify(index));
+    console.log(`  → ${indexPath} (${(fs.statSync(indexPath).size / 1024).toFixed(0)} KB)`);
+
+    // Write per-chapter files
+    const chaptersDir = path.join(DATA_DIR, 'chapters');
+    ensureDir(chaptersDir);
+    let totalChapterSize = 0;
+    for (const [cid, data] of Object.entries(chapterVerseWords)) {
+        const chPath = path.join(chaptersDir, `${cid}.json`);
+        fs.writeFileSync(chPath, JSON.stringify(data));
+        totalChapterSize += fs.statSync(chPath).size;
+    }
+    console.log(`  → ${chaptersDir}/ (${Object.keys(chapterVerseWords).length} files, ${(totalChapterSize / 1024).toFixed(0)} KB total)`);
+
+    const totalWords = Object.keys(chapterVerseWords).reduce((sum, cid) =>
+        sum + chapterVerseWords[cid].verses.reduce((s, v) => s + v.words.length, 0), 0);
+    console.log(`  ${books.length} books, ${chapters.length} chapters, ${verses.length} verses, ${words.length} words, ${totalWords} verse-words`);
 }
 
 // ── 2. Copy frontend assets ─────────────────────────────────────────────────

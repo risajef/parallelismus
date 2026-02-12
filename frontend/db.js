@@ -1,65 +1,53 @@
 /**
- * Browser-side IndexedDB database for Parallelismus.
+ * Browser-side data layer for Parallelismus.
  *
- * On first load it fetches the preprocessed bible.json and populates IndexedDB.
- * Relations are stored locally in IndexedDB and can be exported/imported as JSON.
+ * Bible data (books, chapters, verses, words) is kept **in memory** and loaded
+ * lazily per-chapter from small JSON files produced at build time.  This avoids
+ * the old approach of downloading a 44 MB blob and bulk-inserting 380 K rows
+ * into IndexedDB on the first visit.
+ *
+ * Only user-created **relations** are persisted in IndexedDB.
  */
 
-const DB_NAME = 'parallelismus';
-const DB_VERSION = 1;
-
-// Resolve DATA_URL relative to the script's own location so it works
-// when embedded on a page at a different path.
-const _scriptBase = (function() {
+// ── Base URL resolution ─────────────────────────────────────────────────────
+const _base = (function () {
     try {
-        // When loaded via the embed script, it sets a global base URL
-        if (window.__PARALLELISMUS_BASE__) {
-            return window.__PARALLELISMUS_BASE__;
-        }
-        // When loaded as a standalone script, document.currentScript is available
-        if (document.currentScript && document.currentScript.src) {
+        if (window.__PARALLELISMUS_BASE__) return window.__PARALLELISMUS_BASE__;
+        if (document.currentScript && document.currentScript.src)
             return new URL('./', document.currentScript.src).href;
-        }
-    } catch (e) { /* ignore */ }
-    // Fallback: resolve relative to page URL
+    } catch (_) { /* ignore */ }
     return '';
 })();
-const DATA_URL = _scriptBase + 'data/bible.json';
 
+const INDEX_URL = _base + 'data/bible-index.json';
+function chapterUrl(id) { return _base + 'data/chapters/' + id + '.json'; }
+
+// ── In-memory stores (populated from index + lazy chapter files) ────────────
+let _books = [];           // { id, name }[]
+let _chapters = [];        // { id, book_id, number }[]
+let _verses = [];          // { id, chapter_id, number }[]
+let _wordsMap = {};        // strong → { strong, original[], translation[] }
+let _chapterIdx = {};      // book_id  → chapter[]
+let _verseIdx = {};        // chapter_id → verse[]
+let _verseToChapter = {};  // verse_id → chapter_id  (fast reverse lookup)
+
+// Per-chapter verse-word cache  chapter_id → { verses: [{ id, number, words: [[strong,orig,trans],...] }] }
+const _chapterCache = {};
+
+// ── IndexedDB for relations only ────────────────────────────────────────────
+const DB_NAME = 'parallelismus';
+const DB_VERSION = 2;      // bumped – old stores will be deleted on upgrade
 let _db = null;
-let _initPromise = null;
 
-// ── Open / create the IndexedDB schema ──────────────────────────────────────
-function openDB() {
+function openRelationsDB() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (ev) => {
             const db = ev.target.result;
-            // books
-            if (!db.objectStoreNames.contains('books')) {
-                db.createObjectStore('books', { keyPath: 'id' });
+            // Remove old bible data stores if present (migration from v1)
+            for (const name of ['books', 'chapters', 'verses', 'verseWords', 'words']) {
+                if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name);
             }
-            // chapters
-            if (!db.objectStoreNames.contains('chapters')) {
-                const store = db.createObjectStore('chapters', { keyPath: 'id' });
-                store.createIndex('book_id', 'book_id', { unique: false });
-            }
-            // verses
-            if (!db.objectStoreNames.contains('verses')) {
-                const store = db.createObjectStore('verses', { keyPath: 'id' });
-                store.createIndex('chapter_id', 'chapter_id', { unique: false });
-            }
-            // verseWords
-            if (!db.objectStoreNames.contains('verseWords')) {
-                const store = db.createObjectStore('verseWords', { keyPath: 'id' });
-                store.createIndex('verse_id', 'verse_id', { unique: false });
-                store.createIndex('word_id', 'word_id', { unique: false });
-            }
-            // words (keyed by strong id)
-            if (!db.objectStoreNames.contains('words')) {
-                db.createObjectStore('words', { keyPath: 'strong' });
-            }
-            // relations (autoIncrement id)
             if (!db.objectStoreNames.contains('relations')) {
                 const store = db.createObjectStore('relations', { keyPath: 'id', autoIncrement: true });
                 store.createIndex('source_id', 'source_id', { unique: false });
@@ -71,217 +59,147 @@ function openDB() {
     });
 }
 
-// ── Bulk-load helper ────────────────────────────────────────────────────────
-function bulkPut(db, storeName, items) {
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        for (const item of items) store.put(item);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-}
-
-function countStore(db, storeName) {
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).count();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-// ── Clear all object stores ──────────────────────────────────────────────────
-function clearStore(db, storeName) {
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-}
-
-// ── Seed bible data if empty ────────────────────────────────────────────────
-async function seedIfNeeded(db, onProgress) {
-    // Check the LAST table that gets loaded — if it's populated, everything is complete.
-    // Previous versions only checked books, so a partial load (books+chapters+verses
-    // but no words/verseWords) would never be repaired.
-    const booksCount = await countStore(db, 'books');
-    const vwCount = await countStore(db, 'verseWords');
-    const wordsCount = await countStore(db, 'words');
-
-    if (booksCount > 0 && vwCount > 0 && wordsCount > 0) {
-        if (onProgress) onProgress('Database already loaded.');
-        return;
-    }
-
-    // Incomplete data from a previous failed load — wipe everything first
-    if (booksCount > 0 || vwCount > 0 || wordsCount > 0) {
-        if (onProgress) onProgress('Incomplete database detected, re-downloading…');
-        for (const store of ['books', 'chapters', 'verses', 'words', 'verseWords']) {
-            await clearStore(db, store);
-        }
-    }
-
-    if (onProgress) onProgress('Downloading bible data…');
-    const resp = await fetch(DATA_URL);
-    if (!resp.ok) throw new Error(`Failed to fetch ${DATA_URL}: ${resp.status}`);
-    const data = await resp.json();
-
-    if (onProgress) onProgress('Loading books…');
-    await bulkPut(db, 'books', data.books);
-
-    if (onProgress) onProgress('Loading chapters…');
-    await bulkPut(db, 'chapters', data.chapters);
-
-    if (onProgress) onProgress('Loading verses…');
-    await bulkPut(db, 'verses', data.verses);
-
-    if (onProgress) onProgress('Loading words…');
-    await bulkPut(db, 'words', data.words);
-
-    if (onProgress) onProgress('Loading verse-words (this may take a moment)…');
-    // Split verseWords into chunks to avoid blocking the main thread too long
-    const VW = data.verseWords;
-    const CHUNK = 20000;
-    for (let i = 0; i < VW.length; i += CHUNK) {
-        await bulkPut(db, 'verseWords', VW.slice(i, i + CHUNK));
-        if (onProgress) onProgress(`Loading verse-words… ${Math.min(i + CHUNK, VW.length)}/${VW.length}`);
-    }
-
-    if (onProgress) onProgress('Database ready.');
-}
-
 // ── Public init ─────────────────────────────────────────────────────────────
+let _initPromise = null;
+
 export async function initDB(onProgress) {
-    if (_db) return _db;
     if (_initPromise) return _initPromise;
     _initPromise = (async () => {
-        _db = await openDB();
-        await seedIfNeeded(_db, onProgress);
-        return _db;
+        if (onProgress) onProgress('Loading bible index…');
+        const resp = await fetch(INDEX_URL);
+        if (!resp.ok) throw new Error(`Failed to fetch ${INDEX_URL}: ${resp.status}`);
+        const data = await resp.json();
+
+        _books = data.books;
+        _chapters = data.chapters;
+        _verses = data.verses;
+
+        // Build word dictionary
+        _wordsMap = {};
+        for (const w of data.words) _wordsMap[w.strong] = w;
+
+        // Build lookup indices
+        _chapterIdx = {};
+        for (const c of _chapters) {
+            if (!_chapterIdx[c.book_id]) _chapterIdx[c.book_id] = [];
+            _chapterIdx[c.book_id].push(c);
+        }
+        _verseIdx = {};
+        _verseToChapter = {};
+        for (const v of _verses) {
+            if (!_verseIdx[v.chapter_id]) _verseIdx[v.chapter_id] = [];
+            _verseIdx[v.chapter_id].push(v);
+            _verseToChapter[v.id] = v.chapter_id;
+        }
+
+        // Open IndexedDB for relations
+        _db = await openRelationsDB();
+        if (onProgress) onProgress('Ready.');
     })();
     return _initPromise;
 }
 
-export function getDB() {
-    if (!_db) throw new Error('DB not initialised – call initDB() first');
-    return _db;
+// ── Lazy chapter loading ────────────────────────────────────────────────────
+async function ensureChapter(chapterId) {
+    if (_chapterCache[chapterId]) return _chapterCache[chapterId];
+    const resp = await fetch(chapterUrl(chapterId));
+    if (!resp.ok) throw new Error(`Failed to fetch chapter ${chapterId}: ${resp.status}`);
+    const data = await resp.json();
+    _chapterCache[chapterId] = data;
+    return data;
 }
 
-// ── Generic query helpers ───────────────────────────────────────────────────
-function getAll(storeName) {
-    return new Promise((resolve, reject) => {
-        const tx = _db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-function getByKey(storeName, key) {
-    return new Promise((resolve, reject) => {
-        const tx = _db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).get(key);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-function getAllByIndex(storeName, indexName, value) {
-    return new Promise((resolve, reject) => {
-        const tx = _db.transaction(storeName, 'readonly');
-        const idx = tx.objectStore(storeName).index(indexName);
-        const req = idx.getAll(value);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-}
-
-// ── API matching the old backend endpoints ──────────────────────────────────
+// ── API matching the old interface ──────────────────────────────────────────
 
 export async function fetchBooks() {
-    return getAll('books');
+    return _books;
 }
 
 export async function fetchChapters(bookId) {
-    return getAllByIndex('chapters', 'book_id', Number(bookId));
+    return _chapterIdx[Number(bookId)] || [];
 }
 
 export async function fetchVerses(chapterId) {
-    return getAllByIndex('verses', 'chapter_id', Number(chapterId));
+    return _verseIdx[Number(chapterId)] || [];
 }
 
 export async function fetchWords(verseId) {
-    // Returns WordInVerse-like objects for a given verse
-    const vws = await getAllByIndex('verseWords', 'verse_id', Number(verseId));
-    // look up the global Word for each verseWord
-    const result = [];
-    const tx = _db.transaction('words', 'readonly');
-    const store = tx.objectStore('words');
-    for (const vw of vws) {
-        const word = await new Promise((res, rej) => {
-            const r = store.get(vw.word_id);
-            r.onsuccess = () => res(r.result);
-            r.onerror = () => rej(r.error);
-        });
-        result.push({
-            strong: vw.word_id,
-            verse_original: vw.original || '',
-            verse_translation: vw.translation || '',
+    const cid = _verseToChapter[Number(verseId)];
+    if (cid == null) return [];
+    const chData = await ensureChapter(cid);
+    const vData = chData.verses.find(v => v.id === Number(verseId));
+    if (!vData || !vData.words) return [];
+
+    return vData.words.map(w => {
+        // w is [strong, original, translation]
+        const strong = w[0];
+        const word = _wordsMap[strong];
+        return {
+            strong,
+            verse_original: w[1] || '',
+            verse_translation: w[2] || '',
             all_originals: word ? word.original : [],
             all_translations: word ? word.translation : [],
-        });
-    }
-    return result;
+        };
+    });
 }
 
 export async function fetchVerse(verseId) {
-    return getByKey('verses', Number(verseId));
+    return _verses.find(v => v.id === Number(verseId)) || null;
 }
 
 export async function fetchChapter(chapterId) {
-    const ch = await getByKey('chapters', Number(chapterId));
+    const ch = _chapters.find(c => c.id === Number(chapterId));
     if (!ch) throw new Error('Chapter not found');
     return ch;
 }
 
 export async function fetchChapterWords(chapterId) {
-    // All verse-words for every verse in a chapter
-    const verses = await getAllByIndex('verses', 'chapter_id', Number(chapterId));
+    const chData = await ensureChapter(Number(chapterId));
     const result = [];
-    for (const v of verses) {
-        const words = await fetchWords(v.id);
-        for (const w of words) {
-            result.push({ verse_id: v.id, ...w });
+    for (const v of chData.verses) {
+        for (const w of v.words) {
+            const strong = w[0];
+            const word = _wordsMap[strong];
+            result.push({
+                verse_id: v.id,
+                strong,
+                verse_original: w[1] || '',
+                verse_translation: w[2] || '',
+                all_originals: word ? word.original : [],
+                all_translations: word ? word.translation : [],
+            });
         }
     }
     return result;
 }
 
 export async function fetchWordDetail(strong) {
-    const word = await getByKey('words', strong);
+    const word = _wordsMap[strong];
     if (!word) throw new Error('Word not found');
-    // find usages from verseWords
-    const vws = await getAllByIndex('verseWords', 'word_id', strong);
+
+    // Scan cached chapters for usages (avoids fetching all 1188 chapters)
     const usages = [];
-    for (const vw of vws) {
-        const verse = await getByKey('verses', vw.verse_id);
-        if (!verse) continue;
-        const chapter = await getByKey('chapters', verse.chapter_id);
+    for (const [cid, chData] of Object.entries(_chapterCache)) {
+        const chapter = _chapters.find(c => c.id === Number(cid));
         if (!chapter) continue;
-        const book = await getByKey('books', chapter.book_id);
-        if (!book) continue;
-        usages.push({
-            verse_id: verse.id,
-            verse_number: verse.number,
-            chapter_id: chapter.id,
-            chapter_number: chapter.number,
-            book_id: book.id,
-            book_name: book.name,
-            verse_original: vw.original || '',
-            verse_translation: vw.translation || '',
-        });
+        const book = _books.find(b => b.id === chapter.book_id);
+        for (const v of chData.verses) {
+            for (const w of v.words) {
+                if (w[0] === strong) {
+                    usages.push({
+                        verse_id: v.id,
+                        verse_number: v.number,
+                        chapter_id: chapter.id,
+                        chapter_number: chapter.number,
+                        book_id: book ? book.id : 0,
+                        book_name: book ? book.name : '',
+                        verse_original: w[1] || '',
+                        verse_translation: w[2] || '',
+                    });
+                }
+            }
+        }
     }
     return {
         strong: word.strong,
@@ -291,13 +209,12 @@ export async function fetchWordDetail(strong) {
     };
 }
 
-// ── Strong search (in-browser substring match) ──────────────────────────────
+// ── Strong search (in-memory substring match) ──────────────────────────────
 export async function fetchStrongSearch(query) {
     const term = (query || '').trim().toLowerCase();
     if (!term) return [];
-    const allWords = await getAll('words');
     const out = [];
-    for (const w of allWords) {
+    for (const w of Object.values(_wordsMap)) {
         let matched = false;
         for (const t of (w.translation || [])) {
             if (t && t.toLowerCase().includes(term)) { matched = true; break; }
@@ -307,11 +224,34 @@ export async function fetchStrongSearch(query) {
                 if (o && o.toLowerCase().includes(term)) { matched = true; break; }
             }
         }
+        if (!matched && w.strong && w.strong.toLowerCase().includes(term)) {
+            matched = true;
+        }
         if (matched) {
             out.push({ strong: w.strong, original: w.original, translation: w.translation });
         }
     }
     return out;
+}
+
+// ── IndexedDB helpers for relations ─────────────────────────────────────────
+
+function relGetAll() {
+    return new Promise((resolve, reject) => {
+        const tx = _db.transaction('relations', 'readonly');
+        const req = tx.objectStore('relations').getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function relGet(id) {
+    return new Promise((resolve, reject) => {
+        const tx = _db.transaction('relations', 'readonly');
+        const req = tx.objectStore('relations').get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
 }
 
 // ── Relations CRUD ──────────────────────────────────────────────────────────
@@ -320,7 +260,6 @@ export async function addRelation(payload) {
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
         const store = tx.objectStore('relations');
-        // omit id so autoIncrement assigns one
         const record = {
             source_id: payload.source_id,
             target_id: payload.target_id,
@@ -329,16 +268,13 @@ export async function addRelation(payload) {
             notes: payload.notes || null,
         };
         const req = store.add(record);
-        req.onsuccess = () => {
-            record.id = req.result;
-            resolve(record);
-        };
+        req.onsuccess = () => { record.id = req.result; resolve(record); };
         req.onerror = () => reject(req.error);
     });
 }
 
 export async function deleteRelation(relationId) {
-    const rel = await getByKey('relations', Number(relationId));
+    const rel = await relGet(Number(relationId));
     if (!rel) throw new Error('Relation not found');
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
@@ -349,7 +285,7 @@ export async function deleteRelation(relationId) {
 }
 
 export async function fetchRelations(strong) {
-    const all = await getAll('relations');
+    const all = await relGetAll();
     return all.filter(r => r.source_id === strong || r.target_id === strong);
 }
 
@@ -369,7 +305,7 @@ export async function fetchGroupedRelations(strong) {
 
 export async function fetchRelationsBatch(ids) {
     if (!Array.isArray(ids) || ids.length === 0) return {};
-    const all = await getAll('relations');
+    const all = await relGetAll();
     const out = {};
     for (const id of ids) out[id] = false;
     for (const r of all) {
@@ -381,7 +317,7 @@ export async function fetchRelationsBatch(ids) {
 
 export async function fetchRelationsCounts(ids) {
     if (!Array.isArray(ids) || ids.length === 0) return {};
-    const all = await getAll('relations');
+    const all = await relGetAll();
     const out = {};
     for (const id of ids) out[id] = 0;
     for (const r of all) {
@@ -392,71 +328,99 @@ export async function fetchRelationsCounts(ids) {
 }
 
 export async function fetchRelationTypes() {
-    const all = await getAll('relations');
+    const all = await relGetAll();
     const types = new Set();
     for (const r of all) if (r.relation_type) types.add(r.relation_type);
     return [...types].sort();
 }
 
 export async function fetchAllRelations(limit = 500, relationType = null) {
-    let all = await getAll('relations');
+    let all = await relGetAll();
     if (relationType) all = all.filter(r => r.relation_type === relationType);
     if (limit) all = all.slice(0, limit);
-    // build labels
-    const ids = new Set();
-    for (const r of all) {
-        if (r.source_id) ids.add(r.source_id);
-        if (r.target_id) ids.add(r.target_id);
-    }
-    const wordMap = {};
-    const tx = _db.transaction('words', 'readonly');
-    const store = tx.objectStore('words');
-    for (const id of ids) {
-        const w = await new Promise((res, rej) => { const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-        if (w) wordMap[id] = w;
-    }
-    function buildLabel(word, fallback) {
-        if (!word) return fallback;
-        if (Array.isArray(word.translation) && word.translation[0]) return `${fallback} — ${word.translation[0]}`;
-        if (Array.isArray(word.original) && word.original[0]) return `${fallback} — ${word.original[0]}`;
-        return fallback;
+    function buildLabel(strong) {
+        const w = _wordsMap[strong];
+        if (!w) return strong || '';
+        if (Array.isArray(w.translation) && w.translation[0]) return `${strong} — ${w.translation[0]}`;
+        if (Array.isArray(w.original) && w.original[0]) return `${strong} — ${w.original[0]}`;
+        return strong || '';
     }
     return all.map(r => ({
         id: r.id,
         source_id: r.source_id,
         target_id: r.target_id,
         relation_type: r.relation_type,
-        source_label: buildLabel(wordMap[r.source_id], r.source_id || ''),
-        target_label: buildLabel(wordMap[r.target_id], r.target_id || ''),
+        source_label: buildLabel(r.source_id),
+        target_label: buildLabel(r.target_id),
     }));
 }
 
 // ── Export / Import relations ────────────────────────────────────────────────
 
 export async function exportRelations() {
-    const all = await getAll('relations');
+    const all = await relGetAll();
     return JSON.stringify(all, null, 2);
 }
 
 export async function importRelations(jsonString) {
     const records = JSON.parse(jsonString);
     if (!Array.isArray(records)) throw new Error('Expected an array of relation objects');
-    // clear existing relations first
     await new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
         tx.objectStore('relations').clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     });
-    // add imported relations
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
         const store = tx.objectStore('relations');
-        for (const rec of records) {
-            // preserve id if present
-            store.put(rec);
-        }
+        for (const rec of records) store.put(rec);
         tx.oncomplete = () => resolve(records.length);
         tx.onerror = () => reject(tx.error);
     });
+}
+
+// ── Transliteration ─────────────────────────────────────────────────────────
+function stripDiacritics(s) {
+    try { return s.normalize('NFD').replace(/\p{M}/gu, ''); } catch { return s; }
+}
+
+function transliterateGreek(s) {
+    if (!s) return '';
+    let t = stripDiacritics(s.toLowerCase());
+    const map = {α:'a',β:'b',γ:'g',δ:'d',ε:'e',ζ:'z',η:'e',θ:'th',ι:'i',κ:'k',λ:'l',μ:'m',ν:'n',ξ:'x',ο:'o',π:'p',ρ:'r',σ:'s',ς:'s',τ:'t',υ:'u',φ:'ph',χ:'ch',ψ:'ps',ω:'o'};
+    let out = '';
+    for (const c of t) out += map[c] !== undefined ? map[c] : (/[a-z0-9]/.test(c) ? c : '');
+    return out.replace(/uu/g, 'u').replace(/phh/g, 'ph');
+}
+
+function transliterateHebrew(s) {
+    if (!s) return '';
+    const t = s.normalize('NFD');
+    const cmap = {'\u05D0':'','\u05D1':'b','\u05D2':'g','\u05D3':'d','\u05D4':'h','\u05D5':'v','\u05D6':'z','\u05D7':'ch','\u05D8':'t','\u05D9':'y','\u05DB':'k','\u05DA':'k','\u05DC':'l','\u05DE':'m','\u05DD':'m','\u05E0':'n','\u05E1':'s','\u05E2':'','\u05E3':'p','\u05E4':'p','\u05E5':'ts','\u05E6':'ts','\u05E7':'q','\u05E8':'r','\u05E9':'sh','\u05EA':'t'};
+    const vmap = {'\u05B0':'e','\u05B1':'e','\u05B2':'a','\u05B3':'a','\u05B4':'i','\u05B5':'e','\u05B6':'e','\u05B7':'a','\u05B8':'a','\u05B9':'o','\u05BB':'u','\u05C7':'o'};
+    const shinDot = '\u05C1', sinDot = '\u05C2';
+    const parts = []; let last = -1;
+    for (let i = 0; i < t.length; i++) {
+        const ch = t[i], cp = ch.codePointAt(0);
+        if (cp >= 0x05D0 && cp <= 0x05EA) { parts.push(cmap[ch] !== undefined ? cmap[ch] : ''); last = parts.length - 1; continue; }
+        if (vmap[ch]) { if (last >= 0) parts[last] += vmap[ch]; else { parts.push(vmap[ch]); last = parts.length - 1; } continue; }
+        if (ch === sinDot) { if (last >= 0 && parts[last].endsWith('sh')) parts[last] = parts[last].slice(0, -2) + 's'; continue; }
+        if (ch === shinDot) { if (last >= 0 && parts[last].endsWith('s')) parts[last] += 'h'; continue; }
+        if (/[A-Za-z0-9]/.test(ch)) { parts.push(ch); last = parts.length - 1; }
+    }
+    let out = parts.join(' ').replace(/\s+/g, ' ').trim();
+    return out.replace(/''/g, "'").toLowerCase();
+}
+
+export function transliterate(s) {
+    if (!s) return '';
+    try {
+        if (/\p{Script=Greek}/u.test(s)) return transliterateGreek(s);
+        if (/\p{Script=Hebrew}/u.test(s)) return transliterateHebrew(s);
+    } catch {
+        if (/[\u0370-\u03FF]/.test(s)) return transliterateGreek(s);
+        if (/[\u0590-\u05FF]/.test(s)) return transliterateHebrew(s);
+    }
+    return '';
 }
