@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const esbuild = require('esbuild');
 
 const ROOT = __dirname;
 const BIBLE_DIR = path.join(ROOT, 'bible');
@@ -173,19 +174,56 @@ function compileScss() {
     }
 }
 
-// ── Run ──────────────────────────────────────────────────────────────────────
-try {
-    // clean
-    if (fs.existsSync(DIST_DIR)) {
-        fs.rmSync(DIST_DIR, { recursive: true, force: true });
+// ── 4. Bundle JavaScript files ───────────────────────────────────────────────
+async function bundleJs() {
+    console.log('Bundling JavaScript…');
+    
+    // Bundle main index.js
+    await esbuild.build({
+        entryPoints: [path.join(FRONTEND_DIR, 'index.static.js')],
+        bundle: true,
+        format: 'iife',
+        outfile: path.join(DIST_DIR, 'index.js'),
+        minify: true,
+        sourcemap: false,
+    });
+    console.log('  index.js bundled');
+    
+    // Bundle other pages if they exist
+    const pagesToBundle = ['strong_search.static.js', 'graph.static.js'];
+    for (const page of pagesToBundle) {
+        const entryPath = path.join(FRONTEND_DIR, page);
+        if (fs.existsSync(entryPath)) {
+            const outName = page.replace('.static.js', '.js');
+            await esbuild.build({
+                entryPoints: [entryPath],
+                bundle: true,
+                format: 'iife',
+                outfile: path.join(DIST_DIR, outName),
+                minify: true,
+                sourcemap: false,
+            });
+            console.log(`  ${outName} bundled`);
+        }
     }
-
-    preprocessBible();
-    copyFrontend();
-    compileScss();
-
-    console.log('\n✅ Build complete. Serve dist/ as a static site.');
-} catch (err) {
-    console.error('Build failed:', err);
-    process.exit(1);
 }
+
+// ── Run ──────────────────────────────────────────────────────────────────────
+(async () => {
+    try {
+        // clean
+        if (fs.existsSync(DIST_DIR)) {
+            fs.rmSync(DIST_DIR, { recursive: true, force: true });
+        }
+
+        preprocessBible();
+        copyFrontend();
+        compileScss();
+        await bundleJs();
+
+        console.log('\n✅ Build complete. Serve dist/ as a static site.');
+    } catch (err) {
+        console.error('Build failed:', err);
+        process.exit(1);
+    }
+})();
