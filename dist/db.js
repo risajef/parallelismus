@@ -22,6 +22,15 @@ const _base = (function () {
 const INDEX_URL = _base + 'data/bible-index.json';
 function chapterUrl(id) { return _base + 'data/chapters/' + id + '.json'; }
 
+const RELATION_TYPES = [
+    'composes',
+    'opposite',
+    'similar',
+    'element_of',
+    'subset_of',
+    'attribute_of',
+];
+
 // ── In-memory stores (populated from index + lazy chapter files) ────────────
 let _books = [];           // { id, name }[]
 let _chapters = [];        // { id, book_id, number }[]
@@ -328,10 +337,7 @@ export async function fetchRelationsCounts(ids) {
 }
 
 export async function fetchRelationTypes() {
-    const all = await relGetAll();
-    const types = new Set();
-    for (const r of all) if (r.relation_type) types.add(r.relation_type);
-    return [...types].sort();
+    return RELATION_TYPES.slice();
 }
 
 export async function fetchAllRelations(limit = 500, relationType = null) {

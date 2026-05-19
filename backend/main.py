@@ -10,9 +10,19 @@ from pydantic import BaseModel
 from .database import create_db_and_tables, engine
 from .models import Book, Chapter, Verse, Word, Relation, VerseWord
 
+RELATION_TYPES = [
+    "composes",
+    "opposite",
+    "similar",
+    "element_of",
+    "subset_of",
+    "attribute_of",
+]
+
 
 class WordInVerse(BaseModel):
     """Word with verse-specific original and translation from VerseWord association."""
+
     strong: str
     # verse-specific canonical original and translation (from VerseWord)
     verse_original: str
@@ -70,10 +80,17 @@ app.mount("/static", StaticFiles(directory="frontend"), name="frontend-static")
 def root() -> FileResponse:
     return FileResponse("frontend/index.html")
 
+
 # allow CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:8001", "http://127.0.0.1:8001", "*"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+        "*",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,6 +105,7 @@ def on_startup():
 @app.get("/books", response_model=List[Book])
 def list_books(request: Request):
     from sqlmodel import Session
+
     with Session(engine) as session:
         return session.exec(select(Book)).all()
 
@@ -95,6 +113,7 @@ def list_books(request: Request):
 @app.get("/books/{book_id}/chapters", response_model=List[Chapter])
 def list_chapters(book_id: int, request: Request):
     from sqlmodel import Session
+
     with Session(engine) as session:
         return session.exec(select(Chapter).where(Chapter.book_id == book_id)).all()
 
@@ -102,6 +121,7 @@ def list_chapters(book_id: int, request: Request):
 @app.get("/chapters/{chapter_id}/verses", response_model=List[Verse])
 def list_verses(chapter_id: int, request: Request):
     from sqlmodel import Session
+
     with Session(engine) as session:
         return session.exec(select(Verse).where(Verse.chapter_id == chapter_id)).all()
 
@@ -110,9 +130,14 @@ def list_verses(chapter_id: int, request: Request):
 def list_words(verse_id: int, request: Request):
     from sqlmodel import Session
     from sqlmodel import select as _select
+
     with Session(engine) as session:
         # join Word and VerseWord to get both the global word data and verse-specific original/translation
-        stmt = _select(Word, VerseWord).join(VerseWord, Word.strong == VerseWord.word_id).where(VerseWord.verse_id == verse_id)
+        stmt = (
+            _select(Word, VerseWord)
+            .join(VerseWord, Word.strong == VerseWord.word_id)
+            .where(VerseWord.verse_id == verse_id)
+        )
         results = session.exec(stmt).all()
         return [
             WordInVerse(
@@ -120,7 +145,7 @@ def list_words(verse_id: int, request: Request):
                 verse_original=vw.original,
                 verse_translation=vw.translation,
                 all_originals=word.original,
-                all_translations=word.translation
+                all_translations=word.translation,
             )
             for word, vw in results
         ]
@@ -129,8 +154,13 @@ def list_words(verse_id: int, request: Request):
 @app.get("/words/{word_id}/relations", response_model=List[Relation])
 def get_relations(word_id: str):
     from sqlmodel import Session
+
     with Session(engine) as session:
-        return session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
+        return session.exec(
+            select(Relation).where(
+                (Relation.source_id == word_id) | (Relation.target_id == word_id)
+            )
+        ).all()
 
 
 @app.get("/relations/batch")
@@ -138,12 +168,17 @@ def relations_batch(ids: str):
     """Return a mapping of strong id -> boolean indicating whether any relation exists for that id.
     Expects a comma-separated list of ids in the `ids` query parameter.
     """
-    ids_list = [i for i in ids.split(',') if i]
+    ids_list = [i for i in ids.split(",") if i]
     if not ids_list:
         return {}
     from sqlmodel import Session
+
     with Session(engine) as session:
-        rows = session.exec(select(Relation).where((Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list)))).all()
+        rows = session.exec(
+            select(Relation).where(
+                (Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list))
+            )
+        ).all()
         out = {i: False for i in ids_list}
         for r in rows:
             if r.source_id in out:
@@ -158,12 +193,17 @@ def relations_counts(ids: str):
     """Return a mapping of strong id -> integer count of relations involving that id.
     Expects a comma-separated list of ids in the `ids` query parameter.
     """
-    ids_list = [i for i in ids.split(',') if i]
+    ids_list = [i for i in ids.split(",") if i]
     if not ids_list:
         return {}
     from sqlmodel import Session
+
     with Session(engine) as session:
-        rows = session.exec(select(Relation).where((Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list)))).all()
+        rows = session.exec(
+            select(Relation).where(
+                (Relation.source_id.in_(ids_list)) | (Relation.target_id.in_(ids_list))
+            )
+        ).all()
         out = {i: 0 for i in ids_list}
         for r in rows:
             if r.source_id in out:
@@ -215,14 +255,20 @@ def relations_all(limit: int = 500, relation_type: str | None = None):
 
         response = []
         for rel in relations:
-            response.append({
-                "id": rel.id,
-                "source_id": rel.source_id,
-                "target_id": rel.target_id,
-                "relation_type": rel.relation_type,
-                "source_label": build_label(word_map.get(rel.source_id), rel.source_id or ""),
-                "target_label": build_label(word_map.get(rel.target_id), rel.target_id or ""),
-            })
+            response.append(
+                {
+                    "id": rel.id,
+                    "source_id": rel.source_id,
+                    "target_id": rel.target_id,
+                    "relation_type": rel.relation_type,
+                    "source_label": build_label(
+                        word_map.get(rel.source_id), rel.source_id or ""
+                    ),
+                    "target_label": build_label(
+                        word_map.get(rel.target_id), rel.target_id or ""
+                    ),
+                }
+            )
         return response
 
 
@@ -231,45 +277,55 @@ def get_word_detail(strong: str):
     """Return word variants and list of usages (which verse/chapter/book and the verse-canonical original/translation)."""
     from sqlmodel import Session
     from sqlmodel import select as _select
+
     with Session(engine) as session:
         word = session.get(Word, strong)
         if not word:
             raise HTTPException(status_code=404, detail="Word not found")
         # find usages from VerseWord join Verse->Chapter->Book
-        stmt = _select(VerseWord, Verse, Chapter, Book).join(Verse, Verse.id == VerseWord.verse_id).join(Chapter, Chapter.id == Verse.chapter_id).join(Book, Book.id == Chapter.book_id).where(VerseWord.word_id == strong)
+        stmt = (
+            _select(VerseWord, Verse, Chapter, Book)
+            .join(Verse, Verse.id == VerseWord.verse_id)
+            .join(Chapter, Chapter.id == Verse.chapter_id)
+            .join(Book, Book.id == Chapter.book_id)
+            .where(VerseWord.word_id == strong)
+        )
         rows = session.exec(stmt).all()
         usages: list[WordUsage] = []
         for vw, verse, chap, book in rows:
-            usages.append(WordUsage(
-                verse_id=(vw.verse_id if vw.verse_id is not None else 0),
-                verse_number=(verse.number if verse.number is not None else 0),
-                chapter_id=(chap.id if chap.id is not None else 0),
-                chapter_number=(chap.number if chap.number is not None else 0),
-                book_id=(book.id if book.id is not None else 0),
-                book_name=book.name,
-                verse_original=vw.original or '',
-                verse_translation=vw.translation or ''
-            ))
-        return WordDetail(strong=word.strong, all_originals=word.original, all_translations=word.translation, usages=usages)
+            usages.append(
+                WordUsage(
+                    verse_id=(vw.verse_id if vw.verse_id is not None else 0),
+                    verse_number=(verse.number if verse.number is not None else 0),
+                    chapter_id=(chap.id if chap.id is not None else 0),
+                    chapter_number=(chap.number if chap.number is not None else 0),
+                    book_id=(book.id if book.id is not None else 0),
+                    book_name=book.name,
+                    verse_original=vw.original or "",
+                    verse_translation=vw.translation or "",
+                )
+            )
+        return WordDetail(
+            strong=word.strong,
+            all_originals=word.original,
+            all_translations=word.translation,
+            usages=usages,
+        )
 
 
 @app.get("/relation_types", response_model=List[str])
 def list_relation_types():
-    from sqlmodel import Session
-    from sqlmodel import select as _select
-    with Session(engine) as session:
-        rows = session.exec(_select(Relation.relation_type).distinct()).all()
-        # rows will be a list of strings
-        return rows
+    return RELATION_TYPES
 
 
 @app.get("/verse/{verse_id}", response_model=Verse)
 def get_verse(verse_id: int, request: Request):
     """Return verse JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
-    accept = request.headers.get('accept', '')
+    accept = request.headers.get("accept", "")
     from sqlmodel import Session
+
     # if the client accepts HTML, serve the SPA so users can deep-link to /verse/{id}
-    if 'text/html' in accept:
+    if "text/html" in accept:
         return FileResponse("frontend/index.html")
     with Session(engine) as session:
         verse = session.get(Verse, verse_id)
@@ -292,6 +348,7 @@ def strong_search(q: str, request: Request):
     """
     from sqlmodel import Session
     from sqlmodel import select as _select
+
     term = q.strip().lower()
     if not term:
         return []
@@ -303,17 +360,23 @@ def strong_search(q: str, request: Request):
         for w in rows:
             matched = False
             # check translations
-            for t in (w.translation or []):
+            for t in w.translation or []:
                 if t and term in t.lower():
                     matched = True
                     break
             if not matched:
-                for o in (w.original or []):
+                for o in w.original or []:
                     if o and term in o.lower():
                         matched = True
                         break
             if matched:
-                out.append({"strong": w.strong, "original": w.original, "translation": w.translation})
+                out.append(
+                    {
+                        "strong": w.strong,
+                        "original": w.original,
+                        "translation": w.translation,
+                    }
+                )
     # return explicit JSON response to avoid content negotiation returning HTML
     return JSONResponse(content=out)
 
@@ -336,7 +399,9 @@ def book_chapter_page(book_id: int, chapter_id: int):
     return FileResponse("frontend/index.html")
 
 
-@app.get("/book/{book_id}/chapter/{chapter_id}/verse/{verse_id}", include_in_schema=False)
+@app.get(
+    "/book/{book_id}/chapter/{chapter_id}/verse/{verse_id}", include_in_schema=False
+)
 def book_chapter_verse_page(book_id: int, chapter_id: int, verse_id: int):
     """Serve the SPA for direct navigation to a verse."""
     return FileResponse("frontend/index.html")
@@ -346,9 +411,9 @@ def book_chapter_verse_page(book_id: int, chapter_id: int, verse_id: int):
 def debug_headers(request: Request):
     """Return the received request headers and client host for debugging proxies/service-workers."""
     try:
-        client = request.client.host if request.client else 'unknown'
+        client = request.client.host if request.client else "unknown"
     except Exception:
-        client = 'unknown'
+        client = "unknown"
     headers = {k: v for k, v in request.headers.items()}
     return JSONResponse(content={"client": client, "headers": headers})
 
@@ -356,10 +421,11 @@ def debug_headers(request: Request):
 @app.get("/chapter/{chapter_id}", response_model=Chapter)
 def get_chapter(chapter_id: int, request: Request):
     """Return chapter JSON for API clients; when accessed by a browser (Accept: text/html) return the SPA HTML so deep links load the app."""
-    accept = request.headers.get('accept', '')
+    accept = request.headers.get("accept", "")
     from sqlmodel import Session
+
     # if the client accepts HTML, serve the SPA so users can deep-link to /chapter/{id}
-    if 'text/html' in accept:
+    if "text/html" in accept:
         return FileResponse("frontend/index.html")
     with Session(engine) as session:
         chap = session.get(Chapter, chapter_id)
@@ -373,20 +439,28 @@ def list_chapter_words(chapter_id: int):
     """Return all WordInVerse-like rows for every verse in a chapter in a single query."""
     from sqlmodel import Session
     from sqlmodel import select as _select
+
     with Session(engine) as session:
         # join Verse -> VerseWord -> Word, filter by Verse.chapter_id
-        stmt = _select(VerseWord, Word, Verse).join(Verse, Verse.id == VerseWord.verse_id).join(Word, Word.strong == VerseWord.word_id).where(Verse.chapter_id == chapter_id)
+        stmt = (
+            _select(VerseWord, Word, Verse)
+            .join(Verse, Verse.id == VerseWord.verse_id)
+            .join(Word, Word.strong == VerseWord.word_id)
+            .where(Verse.chapter_id == chapter_id)
+        )
         rows = session.exec(stmt).all()
         out: list[WordInChapter] = []
         for vw, word, verse in rows:
-            out.append(WordInChapter(
-                verse_id=(vw.verse_id or 0),
-                strong=word.strong,
-                verse_original=vw.original or '',
-                verse_translation=vw.translation or '',
-                all_originals=word.original,
-                all_translations=word.translation
-            ))
+            out.append(
+                WordInChapter(
+                    verse_id=(vw.verse_id or 0),
+                    strong=word.strong,
+                    verse_original=vw.original or "",
+                    verse_translation=vw.translation or "",
+                    all_originals=word.original,
+                    all_translations=word.translation,
+                )
+            )
         return out
 
 
@@ -394,8 +468,13 @@ def list_chapter_words(chapter_id: int):
 def get_grouped_relations(word_id: str):
     """Return relations involving word_id, grouped by (source,target,type) with all source_verse_ids."""
     from sqlmodel import Session
+
     with Session(engine) as session:
-        rows = session.exec(select(Relation).where((Relation.source_id == word_id) | (Relation.target_id == word_id))).all()
+        rows = session.exec(
+            select(Relation).where(
+                (Relation.source_id == word_id) | (Relation.target_id == word_id)
+            )
+        ).all()
         groups: dict[tuple[str, str, str], set[int]] = {}
         for r in rows:
             key = (r.source_id, r.target_id, r.relation_type)
@@ -405,13 +484,21 @@ def get_grouped_relations(word_id: str):
 
         result: list[RelationGroup] = []
         for (s, t, typ), verses in groups.items():
-            result.append(RelationGroup(source_id=s, target_id=t, relation_type=typ, source_verse_ids=sorted(list(verses))))
+            result.append(
+                RelationGroup(
+                    source_id=s,
+                    target_id=t,
+                    relation_type=typ,
+                    source_verse_ids=sorted(list(verses)),
+                )
+            )
         return result
 
 
 @app.post("/relations", response_model=Relation)
 def add_relation(relation: Relation):
     from sqlmodel import Session
+
     with Session(engine) as session:
         session.add(relation)
         session.commit()
@@ -423,6 +510,7 @@ def add_relation(relation: Relation):
 def delete_relation(relation_id: int):
     """Delete a relation by id and return the deleted relation."""
     from sqlmodel import Session
+
     with Session(engine) as session:
         rel = session.get(Relation, relation_id)
         if not rel:
@@ -437,8 +525,8 @@ def delete_relation(relation_id: int):
 @app.get("/{path:path}", include_in_schema=False)
 def catch_all(path: str, request: Request):
     """Catch-all route: serve index.html for HTML requests, 404 for others."""
-    accept = request.headers.get('accept', '')
-    if 'text/html' in accept:
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
         print("catch-all serving index.html for path:", path)
         return FileResponse("frontend/index.html")
     raise HTTPException(status_code=404, detail="Not found")

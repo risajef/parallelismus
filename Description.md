@@ -15,13 +15,19 @@ You can also jump to the verses where the relation was added.
 # Workflow
 It optimizes the workflow of defining relations between two or more words.
 So one can select a "word" and add a relation to the selected words.
-The relations for the beginning are:
-- Similar meaning (because parallelism)
-- Opposite meaning (because parallelism)
-- A is a subcategory of B
-- The objects [A1, A2, ... An] compose together the totality B
+The fixed set of relations is:
+- **composes**: a, b, c ... x make up together the set A (n-ary: select multiple members + one target set)
+- **opposite**: a is the opposite of b
+- **similar**: a is similar to b
+- **element_of**: a is an element of A
+- **subset_of**: a is a subset of A
+- **attribute_of**: a is an attribute of A
 
 More of these relations might be defined in the future.
+
+Clicking/tapping a word toggles selection. A small strong-ID link on each word opens the detail page.
+For binary relations (opposite, similar, element_of, subset_of, attribute_of): select 2 words → source and target are auto-filled.
+For composes: select multiple words → they appear as member chips. Then specify the target set.
 
 
 # Storage

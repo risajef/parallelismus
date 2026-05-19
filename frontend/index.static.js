@@ -13,9 +13,112 @@ const resultEl = document.getElementById('result');
 const nextChapterBtn = document.getElementById('next-chapter');
 const nextVerseBtn = document.getElementById('next-verse');
 const loadingEl = document.getElementById('loading-status');
+const typeEl = document.getElementById('type');
+const binaryFields = document.getElementById('binary-fields');
+const composeFields = document.getElementById('compose-fields');
+const membersList = document.getElementById('members-list');
+const memberInput = document.getElementById('member-input');
+const addMemberBtn = document.getElementById('add-member');
+const composeTargetEl = document.getElementById('compose-target');
 
 let currentChapters = [];
 let currentVerses = [];
+
+function getRelationMode() {
+    return typeEl ? typeEl.value : '';
+}
+
+function isComposeMode() {
+    return getRelationMode() === 'composes';
+}
+
+function addMemberChip(strong) {
+    if (!membersList || !strong) return;
+    if (membersList.querySelector(`[data-strong="${CSS.escape(strong)}"]`)) return;
+
+    const chip = document.createElement('span');
+    chip.className = 'member-chip';
+    chip.dataset.strong = strong;
+    chip.appendChild(document.createTextNode(strong));
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'chip-remove';
+    removeBtn.type = 'button';
+    removeBtn.textContent = 'x';
+    removeBtn.addEventListener('click', () => {
+        chip.remove();
+        document.querySelectorAll(`.word-box[data-strong="${CSS.escape(strong)}"]`).forEach((el) => el.classList.remove('selected'));
+        syncWordSelection();
+    });
+
+    chip.appendChild(removeBtn);
+    membersList.appendChild(chip);
+}
+
+function getComposeMembers() {
+    if (!membersList) return [];
+    return Array.from(membersList.querySelectorAll('.member-chip'))
+        .map((chip) => chip.dataset.strong)
+        .filter(Boolean);
+}
+
+function clearRelationSelection() {
+    document.querySelectorAll('.word-box.selected').forEach((el) => el.classList.remove('selected'));
+    const srcEl = document.getElementById('src');
+    const tgtEl = document.getElementById('tgt');
+    if (srcEl) srcEl.value = '';
+    if (tgtEl) tgtEl.value = '';
+    if (membersList) membersList.innerHTML = '';
+}
+
+function syncWordSelection() {
+    const selected = Array.from(document.querySelectorAll('.word-box.selected'));
+
+    if (isComposeMode()) {
+        if (membersList) membersList.innerHTML = '';
+        selected.forEach((el) => {
+            const strong = el.dataset.strong || '';
+            if (strong) addMemberChip(strong);
+        });
+        return;
+    }
+
+    if (selected.length > 2) {
+        selected.slice(2).forEach((el) => el.classList.remove('selected'));
+    }
+
+    const trimmed = Array.from(document.querySelectorAll('.word-box.selected'));
+    const srcEl = document.getElementById('src');
+    const tgtEl = document.getElementById('tgt');
+    if (srcEl) srcEl.value = trimmed[0]?.dataset.strong || '';
+    if (tgtEl) tgtEl.value = trimmed[1]?.dataset.strong || '';
+}
+
+if (typeEl) {
+    typeEl.addEventListener('change', () => {
+        const compose = isComposeMode();
+        if (binaryFields) binaryFields.hidden = compose;
+        if (composeFields) composeFields.hidden = !compose;
+        clearRelationSelection();
+        if (composeTargetEl) composeTargetEl.value = '';
+    });
+}
+
+if (addMemberBtn && memberInput) {
+    addMemberBtn.addEventListener('click', () => {
+        const strong = memberInput.value.trim();
+        if (!strong) return;
+        addMemberChip(strong);
+        memberInput.value = '';
+    });
+
+    memberInput.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            addMemberBtn.click();
+        }
+    });
+}
 
 // Use transliteration from the shared API module
 const transliterate = api.transliterate;
@@ -203,6 +306,15 @@ function buildWordBox(w) {
     bottom.textContent = canonicalOriginal || (canonicalTranslation ? '' : w.strong || '(no text)');
     box.appendChild(bottom);
 
+    const strongLink = document.createElement('a');
+    strongLink.className = 'strong-link';
+    strongLink.href = 'strong.html#' + encodeURIComponent(w.strong);
+    strongLink.target = '_blank';
+    strongLink.rel = 'noopener noreferrer';
+    strongLink.textContent = w.strong || '';
+    strongLink.addEventListener('click', (ev) => ev.stopPropagation());
+    box.appendChild(strongLink);
+
     // drag
     box.addEventListener('dragstart', (e) => {
         try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) { }
@@ -220,20 +332,17 @@ function buildWordBox(w) {
         } else if (ev.key === ' ') {
             ev.preventDefault();
             box.classList.toggle('selected');
-            const selected = Array.from(document.querySelectorAll('.word-box.selected'));
-            if (selected.length === 1) document.getElementById('src').value = selected[0].dataset.strong || '';
-            else if (selected.length === 2) {
-                document.getElementById('src').value = selected[0].dataset.strong || '';
-                document.getElementById('tgt').value = selected[1].dataset.strong || '';
-            }
+            syncWordSelection();
         }
     });
 
-    // click → open strong detail
-    box.addEventListener('click', () => {
+    box.addEventListener('click', (ev) => {
         const draggedAt = Number(box.dataset.draggedAt || 0);
         if (draggedAt && (Date.now() - draggedAt) < 300) return;
-        window.open('strong.html#' + encodeURIComponent(w.strong), '_blank');
+        if (ev.target.closest('.strong-link')) return;
+        ev.preventDefault();
+        box.classList.toggle('selected');
+        syncWordSelection();
     });
 
     return box;
@@ -284,6 +393,23 @@ function handleAddDrop(ev) {
     ev.preventDefault();
     const strong = ev.dataTransfer.getData('text/plain');
     if (!strong) return;
+
+    if (isComposeMode()) {
+        let handled = false;
+        try {
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const input = el && el.closest ? el.closest('input') : null;
+            if (input === composeTargetEl) {
+                composeTargetEl.value = strong;
+                handled = true;
+            }
+        } catch (e) { }
+        if (!handled) addMemberChip(strong);
+        addPanel.classList.add('drop-target');
+        setTimeout(() => addPanel.classList.remove('drop-target'), 350);
+        return;
+    }
+
     const srcEl = document.getElementById('src');
     const tgtEl = document.getElementById('tgt');
     let handled = false;
@@ -386,7 +512,6 @@ document.getElementById('showRelations').addEventListener('click', async () => {
                     await api.deleteRelation(r.id);
                 }
                 document.getElementById('showRelations').click();
-                await populateRelationTypes();
             } catch (err) {
                 alert('Failed to remove relation(s): ' + String(err));
             }
@@ -484,25 +609,44 @@ versesEl.addEventListener('change', async () => {
 // ── Add relation ────────────────────────────────────────────────────────────
 
 document.getElementById('addRel').addEventListener('click', async () => {
-    const srcEl = document.getElementById('src');
-    const tgtEl = document.getElementById('tgt');
-    const typeEl = document.getElementById('type');
-    const src = srcEl && srcEl.value ? srcEl.value : '';
-    const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
     const type = typeEl && typeEl.value ? typeEl.value.trim() : '';
-    if (!src || !tgt) { resultEl.textContent = 'Please select source and target words'; return; }
-    if (!type) { resultEl.textContent = 'Please enter or select a relation type'; return; }
-    const payload = { source_id: src, target_id: tgt, relation_type: type };
+    if (!type) { resultEl.textContent = 'Please select a relation type'; return; }
     const selectedVerseNumber = Number(versesEl.value || 0);
     const selectedVerse = currentVerses.find(v => Number(v.number) === selectedVerseNumber);
+
+    if (type === 'composes') {
+        const members = getComposeMembers();
+        const target = composeTargetEl ? composeTargetEl.value.trim() : '';
+        if (members.length === 0) { resultEl.textContent = 'Please select at least one member word'; return; }
+        if (!target) { resultEl.textContent = 'Please enter the set / target strong ID'; return; }
+
+        try {
+            for (const member of members) {
+                const payload = { source_id: member, target_id: target, relation_type: 'composes' };
+                if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+                await api.addRelation(payload);
+            }
+            resultEl.textContent = `Added ${members.length} "composes" relation(s) -> ${target}`;
+            clearRelationSelection();
+            if (composeTargetEl) composeTargetEl.value = '';
+        } catch (err) {
+            resultEl.textContent = 'Error adding relations: ' + String(err);
+        }
+        return;
+    }
+
+    const srcEl = document.getElementById('src');
+    const tgtEl = document.getElementById('tgt');
+    const src = srcEl && srcEl.value ? srcEl.value : '';
+    const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
+    if (!src || !tgt) { resultEl.textContent = 'Please select source and target words'; return; }
+
+    const payload = { source_id: src, target_id: tgt, relation_type: type };
     if (selectedVerse) payload.source_verse_id = selectedVerse.id;
     try {
         const res = await api.addRelation(payload);
         resultEl.textContent = 'Relation added: ' + JSON.stringify(res);
-        await populateRelationTypes();
-        document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
-        srcEl.value = '';
-        tgtEl.value = '';
+        clearRelationSelection();
     } catch (err) {
         resultEl.textContent = 'Error adding relation: ' + String(err);
     }
@@ -537,7 +681,6 @@ document.getElementById('importRelations').addEventListener('click', () => {
             const text = await file.text();
             const count = await api.importRelations(text);
             resultEl.textContent = `Imported ${count} relations. Reloading…`;
-            await populateRelationTypes();
             // re-mark words
             const strongIds = Array.from(document.querySelectorAll('.word-box[data-strong]')).map(el => el.dataset.strong).filter(Boolean);
             await markWordsWithRelations([...new Set(strongIds)]);
@@ -588,12 +731,6 @@ async function initFromHash() {
         }
         return;
     }
-}
-
-async function populateRelationTypes() {
-    const types = await api.fetchRelationTypes();
-    const data = document.getElementById('relation-types');
-    data.innerHTML = types.map(t => `<option value="${t}"></option>`).join('');
 }
 
 // Global error handlers

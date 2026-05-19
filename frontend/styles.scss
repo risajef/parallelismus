@@ -62,6 +62,7 @@ header {
 .word-english { font-weight: 600; color: #0f172a; }
 .word-original { font-family: 'Noto Serif', serif; color: $muted; margin-top: .15rem; font-size: .95rem; }
 .word-translit { font-size: .82rem; color: $muted; font-style: italic; margin-top: .12rem; }
+.strong-link { font-size: .72rem; color: rgba($accent, .6); text-decoration: none; margin-top: .2rem; &:hover { color: $accent; text-decoration: underline; } }
 
 .relation-badge { position: absolute; top: -6px; right: -6px; background: #f97316; color: #fff; border-radius: 999px; padding: 2px 6px; font-size: .75rem; font-weight: 600; box-shadow: 0 4px 10px rgba(249,115,22,0.12); }
 
@@ -71,22 +72,48 @@ header {
 
 /* Add-relation panel small button */
 /* Add-relation panel button layout and styles */
-#add-relation-panel {
-  > div { /* the inner column wrapper */
-    > div { /* the row that contains the buttons */
-      display: flex; gap: 8px; align-items: center;
-    }
+.add-relation-form {
+  display: flex; flex-direction: column; gap: 8px;
+  select, input { padding: 10px 12px; border-radius: 8px; border: 1px solid #e6edf3; background: #fff; font-size: .95rem; min-height: 44px; }
+  select { appearance: auto; }
+  .form-label { font-size: .85rem; color: $muted; font-weight: 600; margin-bottom: 2px;
+    select { display: block; width: 100%; margin-top: 4px; }
   }
+}
+
+#binary-fields { display: flex; flex-direction: column; gap: 6px; }
+
+.compose-fields { display: flex; flex-direction: column; gap: 6px; }
+
+.members-list {
+  display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; padding: 6px; border: 1px dashed #d1d9e0; border-radius: 8px; background: #f8fafc;
+  &:empty::before { content: 'Tap words to add members'; color: $muted; font-size: .85rem; }
+}
+
+.member-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: $accent; color: #fff; font-size: .85rem; font-weight: 600;
+  .chip-remove { background: none; border: none; color: rgba(255,255,255,0.8); cursor: pointer; padding: 0 2px; font-size: 1.1rem; line-height: 1; &:hover { color: #fff; } }
+}
+
+.member-add-row {
+  display: flex; gap: 6px;
+  input { flex: 1; }
+  button { min-width: 44px; min-height: 44px; border-radius: 8px; border: 1px solid rgba($accent,.2); background: rgba($accent,.06); color: $accent; font-size: 1.2rem; font-weight: 700; cursor: pointer; }
+}
+
+.action-row { display: flex; gap: 8px; align-items: center; }
+
+#add-relation-panel {
   button#addRel {
     display: inline-flex; align-items: center; gap: 8px;
     background: $accent; color: #fff; border: none; padding: 10px 14px; border-radius: 10px; font-weight: 700;
-    min-height: 42px; line-height: 1; font-size: .95rem;
+    min-height: 44px; line-height: 1; font-size: .95rem;
     box-shadow: 0 10px 22px rgba(37,99,235,0.10); cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
     &:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(37,99,235,0.14); }
     &:focus { outline: 3px solid rgba(37,99,235,0.12); }
     &::before { content: '\2795'; display: inline-block; transform: translateY(-1px); font-size: .95rem; }
   }
-  button#shortcutInfo { background: transparent; border: 1px solid rgba(0,0,0,0.06); padding: 6px; border-radius: 6px; font-size: .95rem; &:hover { background: rgba(0,0,0,0.03); } }
+  button#shortcutInfo { background: transparent; border: 1px solid rgba(0,0,0,0.06); padding: 6px; border-radius: 6px; font-size: .95rem; min-height: 44px; min-width: 44px; &:hover { background: rgba(0,0,0,0.03); } }
 }
 
 /* Show Relations button (in relations panel) */
@@ -120,4 +147,21 @@ header {
   .side-column { position: static; width: 100%; height: auto; }
 }
 
-@media (max-width:720px) { .wrap { padding: 12px; } }
+@media (max-width:720px) {
+  .wrap { padding: 8px; }
+  header h1 { font-size: 1.1rem; }
+  .controls {
+    flex-direction: column; gap: 8px;
+    select, input, button { width: 100%; min-height: 44px; font-size: 1rem; }
+  }
+  .word-box { padding: .5rem; min-width: 3.5ch; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .word-english { font-size: .95rem; }
+  .word-original { font-size: .88rem; }
+  .strong-link { font-size: .68rem; }
+  #relations-panel {
+    input, button { min-height: 44px; font-size: 1rem; }
+  }
+  .add-relation-form {
+    select, input { font-size: 1rem; }
+  }
+}

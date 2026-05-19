@@ -12,6 +12,102 @@ const wordsEl = document.getElementById('words');
 const resultEl = document.getElementById('result');
 const nextChapterBtn = document.getElementById('next-chapter');
 const nextVerseBtn = document.getElementById('next-verse');
+const typeEl = document.getElementById('type');
+const binaryFields = document.getElementById('binary-fields');
+const composeFields = document.getElementById('compose-fields');
+const membersList = document.getElementById('members-list');
+const memberInput = document.getElementById('member-input');
+const addMemberBtn = document.getElementById('add-member');
+const composeTarget = document.getElementById('compose-target');
+
+// --- Relation mode helpers ---
+function getRelationMode() {
+  return typeEl ? typeEl.value : '';
+}
+
+function isComposeMode() {
+  return getRelationMode() === 'composes';
+}
+
+// Switch between binary and compose UI
+if (typeEl) {
+  typeEl.addEventListener('change', () => {
+    const compose = isComposeMode();
+    if (binaryFields) binaryFields.hidden = compose;
+    if (composeFields) composeFields.hidden = !compose;
+    // Clear selections when switching modes
+    document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
+    if (document.getElementById('src')) document.getElementById('src').value = '';
+    if (document.getElementById('tgt')) document.getElementById('tgt').value = '';
+    if (membersList) membersList.innerHTML = '';
+    if (composeTarget) composeTarget.value = '';
+  });
+}
+
+// Add a member chip to the compose members list
+function addMemberChip(strong) {
+  if (!membersList || !strong) return;
+  // Avoid duplicates
+  if (membersList.querySelector(`[data-strong="${CSS.escape(strong)}"]`)) return;
+  const chip = document.createElement('span');
+  chip.className = 'member-chip';
+  chip.dataset.strong = strong;
+  chip.textContent = strong;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'chip-remove';
+  removeBtn.textContent = '×';
+  removeBtn.type = 'button';
+  removeBtn.addEventListener('click', () => {
+    chip.remove();
+    // Deselect matching word box
+    document.querySelectorAll(`.word-box[data-strong="${CSS.escape(strong)}"]`).forEach(el => el.classList.remove('selected'));
+  });
+  chip.appendChild(removeBtn);
+  membersList.appendChild(chip);
+}
+
+// Get all current compose member strong IDs
+function getComposeMembers() {
+  if (!membersList) return [];
+  return Array.from(membersList.querySelectorAll('.member-chip')).map(c => c.dataset.strong).filter(Boolean);
+}
+
+// Sync word selection to the add-relation panel
+function syncWordSelection() {
+  const selected = Array.from(document.querySelectorAll('.word-box.selected'));
+  if (isComposeMode()) {
+    // Rebuild members list from selected words
+    if (membersList) membersList.innerHTML = '';
+    selected.forEach(el => {
+      const strong = el.dataset.strong || '';
+      if (strong) addMemberChip(strong);
+    });
+  } else {
+    const srcEl = document.getElementById('src');
+    const tgtEl = document.getElementById('tgt');
+    if (selected.length === 0) {
+      if (srcEl) srcEl.value = '';
+      if (tgtEl) tgtEl.value = '';
+    } else if (selected.length === 1) {
+      if (srcEl) srcEl.value = selected[0].dataset.strong || '';
+      if (tgtEl) tgtEl.value = '';
+    } else if (selected.length >= 2) {
+      if (srcEl) srcEl.value = selected[0].dataset.strong || '';
+      if (tgtEl) tgtEl.value = selected[1].dataset.strong || '';
+    }
+  }
+}
+
+// Manual member add button
+if (addMemberBtn && memberInput) {
+  addMemberBtn.addEventListener('click', () => {
+    const val = memberInput.value.trim();
+    if (val) { addMemberChip(val); memberInput.value = ''; }
+  });
+  memberInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); addMemberBtn.click(); }
+  });
+}
 
 // (createOption, setOptions, escapeHtml, sampleRandom are imported from dom-utils.js)
 
@@ -201,19 +297,24 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
           } else if (ev.key === ' ') {
             ev.preventDefault();
             box.classList.toggle('selected');
-            const selected = Array.from(document.querySelectorAll('.word-box.selected'));
-            if (selected.length === 1) {
-              document.getElementById('src').value = selected[0].dataset.strong || '';
-            } else if (selected.length === 2) {
-              document.getElementById('src').value = selected[0].dataset.strong || '';
-              document.getElementById('tgt').value = selected[1].dataset.strong || '';
-            }
+            syncWordSelection();
           }
         });
+        // Add strong link for opening detail page
+        const strongLink1 = document.createElement('a');
+        strongLink1.className = 'strong-link';
+        strongLink1.href = '/strong/' + encodeURIComponent(w.strong);
+        strongLink1.target = '_blank';
+        strongLink1.textContent = w.strong;
+        strongLink1.addEventListener('click', (e) => e.stopPropagation());
+        box.appendChild(strongLink1);
         box.addEventListener('click', (ev) => {
           const draggedAt = Number(box.dataset.draggedAt || 0);
           if (draggedAt && (Date.now() - draggedAt) < 300) return;
-          window.open('/strong/' + encodeURIComponent(w.strong), '_blank');
+          if (ev.target.closest('.strong-link')) return;
+          ev.preventDefault();
+          box.classList.toggle('selected');
+          syncWordSelection();
         });
         li.appendChild(box);
         ul.appendChild(li);
@@ -267,15 +368,17 @@ async function loadWords(verseId) {
       } else if (ev.key === ' ') {
         ev.preventDefault();
         box.classList.toggle('selected');
-        const selected = Array.from(document.querySelectorAll('.word-box.selected'));
-        if (selected.length === 1) {
-          document.getElementById('src').value = selected[0].dataset.strong || '';
-        } else if (selected.length === 2) {
-          document.getElementById('src').value = selected[0].dataset.strong || '';
-          document.getElementById('tgt').value = selected[1].dataset.strong || '';
-        }
+        syncWordSelection();
       }
     });
+    // Add strong link for opening detail page
+    const strongLink2 = document.createElement('a');
+    strongLink2.className = 'strong-link';
+    strongLink2.href = '/strong/' + encodeURIComponent(w.strong);
+    strongLink2.target = '_blank';
+    strongLink2.textContent = w.strong;
+    strongLink2.addEventListener('click', (e) => e.stopPropagation());
+    box.appendChild(strongLink2);
     box.setAttribute('draggable', 'true');
     box.addEventListener('dragstart', (e) => {
       try { e.dataTransfer.setData('text/plain', w.strong || ''); } catch (err) { }
@@ -288,7 +391,10 @@ async function loadWords(verseId) {
     box.addEventListener('click', (ev) => {
       const draggedAt = Number(box.dataset.draggedAt || 0);
       if (draggedAt && (Date.now() - draggedAt) < 300) return;
-      window.open('/strong/' + encodeURIComponent(w.strong), '_blank');
+      if (ev.target.closest('.strong-link')) return;
+      ev.preventDefault();
+      box.classList.toggle('selected');
+      syncWordSelection();
     });
     li.appendChild(box);
     wordsEl.appendChild(li);
@@ -446,7 +552,6 @@ document.getElementById('showRelations').addEventListener('click', async () => {
           await api.deleteRelation(r.id);
         }
         document.getElementById('showRelations').click();
-        await populateRelationTypes();
       } catch (err) {
         alert('Failed to remove relation(s): ' + String(err));
       }
@@ -562,34 +667,61 @@ versesEl.addEventListener('change', async () => {
 window.addEventListener('popstate', (ev) => { initFromPath(); });
 
 document.getElementById('addRel').addEventListener('click', async () => {
-  const srcEl = document.getElementById('src');
-  const tgtEl = document.getElementById('tgt');
-  const typeEl = document.getElementById('type');
-  const src = srcEl && srcEl.value ? srcEl.value : '';
-  const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
   const type = typeEl && typeEl.value ? typeEl.value.trim() : '';
-  if (!src || !tgt) {
-    resultEl.textContent = 'Please select source and target words (two chips)';
-    return;
-  }
   if (!type) {
-    resultEl.textContent = 'Please enter or select a relation type';
+    resultEl.textContent = 'Please select a relation type';
     return;
   }
-  const payload = { source_id: src, target_id: tgt, relation_type: type };
-  // versesEl.value contains the ordinal (verse.number); map to DB id for payload
+  // Determine source verse for all relations
   const selectedVerseNumber = Number(versesEl && versesEl.value ? versesEl.value : 0);
   const selectedVerse = currentVerses.find(v => Number(v.number) === selectedVerseNumber);
-  if (selectedVerse) payload.source_verse_id = selectedVerse.id;
-  try {
-    const res = await api.addRelation(payload);
-    resultEl.textContent = 'Relation added: ' + JSON.stringify(res);
-    await populateRelationTypes();
-    document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
-    srcEl.value = '';
-    tgtEl.value = '';
-  } catch (err) {
-    resultEl.textContent = 'Error adding relation: ' + String(err);
+
+  if (type === 'composes') {
+    // Compose mode: multiple members → one target
+    const members = getComposeMembers();
+    const target = composeTarget ? composeTarget.value.trim() : '';
+    if (members.length === 0) {
+      resultEl.textContent = 'Please select at least one member word';
+      return;
+    }
+    if (!target) {
+      resultEl.textContent = 'Please enter the set / target strong ID';
+      return;
+    }
+    try {
+      for (const member of members) {
+        const payload = { source_id: member, target_id: target, relation_type: 'composes' };
+        if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+        await api.addRelation(payload);
+      }
+      resultEl.textContent = `Added ${members.length} "composes" relation(s) → ${target}`;
+      document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
+      if (membersList) membersList.innerHTML = '';
+      if (composeTarget) composeTarget.value = '';
+    } catch (err) {
+      resultEl.textContent = 'Error adding relations: ' + String(err);
+    }
+  } else {
+    // Binary mode
+    const srcEl = document.getElementById('src');
+    const tgtEl = document.getElementById('tgt');
+    const src = srcEl && srcEl.value ? srcEl.value : '';
+    const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
+    if (!src || !tgt) {
+      resultEl.textContent = 'Please select source and target words';
+      return;
+    }
+    const payload = { source_id: src, target_id: tgt, relation_type: type };
+    if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+    try {
+      const res = await api.addRelation(payload);
+      resultEl.textContent = 'Relation added: ' + JSON.stringify(res);
+      document.querySelectorAll('.word-box.selected').forEach(el => el.classList.remove('selected'));
+      srcEl.value = '';
+      tgtEl.value = '';
+    } catch (err) {
+      resultEl.textContent = 'Error adding relation: ' + String(err);
+    }
   }
 });
 
@@ -655,11 +787,5 @@ async function initFromPath() {
 }
 
 initFromPath();
-async function populateRelationTypes() {
-  const types = await api.fetchRelationTypes();
-  const data = document.getElementById('relation-types');
-  data.innerHTML = types.map(t => `<option value="${t}"></option>`).join('');
-}
-populateRelationTypes();
 
 export default {};

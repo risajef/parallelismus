@@ -74,16 +74,38 @@
           </div>
 
           <div class="card" id="add-relation-panel">
-            <div style="display: flex; flex-direction: column; gap: 6px">
-              <input id="src" placeholder="source strong" />
-              <input id="tgt" placeholder="target strong" />
-              <input
-                id="type"
-                list="relation-types"
-                placeholder="relation type"
-              />
-              <datalist id="relation-types"></datalist>
-              <div style="display: flex; gap: 8px; align-items: center">
+            <div class="add-relation-form">
+              <label class="form-label"
+                >Relation type
+                <select id="type">
+                  <option value="">- select -</option>
+                  <option value="composes">composes (a,b,c -> set)</option>
+                  <option value="opposite">opposite</option>
+                  <option value="similar">similar</option>
+                  <option value="element_of">element of</option>
+                  <option value="subset_of">subset of</option>
+                  <option value="attribute_of">attribute of</option>
+                </select>
+              </label>
+
+              <div id="binary-fields">
+                <input id="src" placeholder="source (a)" />
+                <input id="tgt" placeholder="target (b / A)" />
+              </div>
+
+              <div id="compose-fields" class="compose-fields" hidden>
+                <div class="form-label">Members</div>
+                <div id="members-list" class="members-list"></div>
+                <div class="member-add-row">
+                  <input id="member-input" placeholder="strong id" />
+                  <button id="add-member" type="button" title="Add member">
+                    +
+                  </button>
+                </div>
+                <input id="compose-target" placeholder="set / target strong" />
+              </div>
+
+              <div class="action-row">
                 <button id="addRel">Add Relation</button>
                 <button
                   id="shortcutInfo"
@@ -93,7 +115,7 @@
                   ℹ️
                 </button>
               </div>
-              <div id="result" style="margin-top: 8px; color: #111"></div>
+              <div id="result"></div>
             </div>
           </div>
 
