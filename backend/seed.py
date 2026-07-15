@@ -30,7 +30,13 @@ def seed():
         session.add_all([w1, w2, w3])
         session.commit()
 
-        rel = Relation(source_id=w1.id, target_id=w2.id, relation_type="similar", source_verse_id=v1.id, notes="example")
+        rel = Relation(
+            source_id=w1.id,
+            target_id=w2.id,
+            relation_type="similar",
+            source_verse_id=v1.id,
+            notes="example",
+        )
         session.add(rel)
         session.commit()
 

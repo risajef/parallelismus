@@ -8,6 +8,7 @@ class VerseWord(SQLModel, table=True):
     """Association table linking Verse and Word for many-to-many relationship.
     Stores the canonical original and translation from the bible JSON for this specific verse context.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     verse_id: int = Field(foreign_key="verse.id")
     word_id: str = Field(foreign_key="word.strong")
@@ -41,12 +42,22 @@ class Verse(SQLModel, table=True):
 class Word(SQLModel, table=True):
     strong: str = Field(primary_key=True)
     # store possible original spellings and translations as JSON lists
-    original: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
-    translation: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    original: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
+    translation: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False)
+    )
     # a Word can be used in many verses
     verses: list["Verse"] = Relationship(back_populates="words", link_model=VerseWord)
-    relations_from: list["Relation"] = Relationship(back_populates="source_word", sa_relationship_kwargs={"primaryjoin": "Word.strong==Relation.source_id"})
-    relations_to: list["Relation"] = Relationship(back_populates="target_word", sa_relationship_kwargs={"primaryjoin": "Word.strong==Relation.target_id"})
+    relations_from: list["Relation"] = Relationship(
+        back_populates="source_word",
+        sa_relationship_kwargs={"primaryjoin": "Word.strong==Relation.source_id"},
+    )
+    relations_to: list["Relation"] = Relationship(
+        back_populates="target_word",
+        sa_relationship_kwargs={"primaryjoin": "Word.strong==Relation.target_id"},
+    )
 
 
 class Relation(SQLModel, table=True):
@@ -56,7 +67,11 @@ class Relation(SQLModel, table=True):
     relation_type: str
     source_verse_id: Optional[int] = Field(default=None, foreign_key="verse.id")
     notes: Optional[str] = None
-    source_word: Optional["Word"] = Relationship(back_populates="relations_from", sa_relationship_kwargs={"primaryjoin": "Relation.source_id==Word.strong"})
-    target_word: Optional["Word"] = Relationship(back_populates="relations_to", sa_relationship_kwargs={"primaryjoin": "Relation.target_id==Word.strong"})
-
-
+    source_word: Optional["Word"] = Relationship(
+        back_populates="relations_from",
+        sa_relationship_kwargs={"primaryjoin": "Relation.source_id==Word.strong"},
+    )
+    target_word: Optional["Word"] = Relationship(
+        back_populates="relations_to",
+        sa_relationship_kwargs={"primaryjoin": "Relation.target_id==Word.strong"},
+    )

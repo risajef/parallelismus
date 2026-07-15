@@ -6,27 +6,27 @@ from .database import engine, create_db_and_tables
 from .models import Book, Chapter, Verse, Word, VerseWord
 
 
-BASE = Path(__file__).resolve().parents[1] / 'bible'
+BASE = Path(__file__).resolve().parents[1] / "bible"
 
 
 def slug_to_name(filename: str) -> str:
     name = Path(filename).stem
-    return name.replace('_', ' ').title()
+    return name.replace("_", " ").title()
 
 
 def import_all():
     create_db_and_tables()
-    files = sorted(BASE.glob('*.json'))
+    files = sorted(BASE.glob("*.json"))
 
     with Session(engine) as session:
         for f in files:
-            print('Importing', f.name)
+            print("Importing", f.name)
             book_name = slug_to_name(f.name)
 
             # skip if book already present
             existing = session.exec(select(Book).where(Book.name == book_name)).first()
             if existing:
-                print('  exists, skipping')
+                print("  exists, skipping")
                 continue
 
             book = Book(name=book_name)
@@ -34,15 +34,28 @@ def import_all():
             session.commit()
             session.refresh(book)
 
-            with open(f, 'r', encoding='utf-8') as fh:
+            with open(f, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
-            
-            data = [{"verse": v["verse"], "book_nr": int(v["id"][:2]), "chapter_nr": int(v["id"][2:5]), "verse_nr": int(v["id"][5:])} for v in data]
-            data = {chapter_nr: [verse for verse in data if verse["chapter_nr"] == chapter_nr] for chapter_nr in set([verse["chapter_nr"] for verse in data])}
+
+            data = [
+                {
+                    "verse": v["verse"],
+                    "book_nr": int(v["id"][:2]),
+                    "chapter_nr": int(v["id"][2:5]),
+                    "verse_nr": int(v["id"][5:]),
+                }
+                for v in data
+            ]
+            data = {
+                chapter_nr: [
+                    verse for verse in data if verse["chapter_nr"] == chapter_nr
+                ]
+                for chapter_nr in set([verse["chapter_nr"] for verse in data])
+            }
 
             # data is a list of chapters
             for chapter_nr in sorted(data.keys()):
-                print(f'  Importing chapter {chapter_nr}')
+                print(f"  Importing chapter {chapter_nr}")
                 verses = data[chapter_nr]
                 chapter = Chapter(book_id=book.id, number=chapter_nr)
                 session.add(chapter)
@@ -57,7 +70,7 @@ def import_all():
                     # ensure we have an id to reference (type-checker and runtime safety)
                     assert v.id is not None
 
-                    verse = verse.get('verse')
+                    verse = verse.get("verse")
 
                     if not isinstance(verse, list):
                         continue
@@ -67,16 +80,18 @@ def import_all():
                     for w in verse:
                         if not isinstance(w, dict):
                             continue
-                        strong = w.get('number')
+                        strong = w.get("number")
                         if isinstance(strong, str):
                             strong = strong.strip()
                         if not strong:
                             continue
-                        original = w.get('word')
-                        translation = w.get('text')
+                        original = w.get("word")
+                        translation = w.get("text")
 
                         # lookup global Word for this strong
-                        existing = session.exec(select(Word).where(Word.strong == strong)).first()
+                        existing = session.exec(
+                            select(Word).where(Word.strong == strong)
+                        ).first()
                         if existing:
                             # normalize existing fields to sets
                             def to_set(val):
@@ -101,20 +116,28 @@ def import_all():
                         else:
                             originals = [original] if original else []
                             translations = [translation] if translation else []
-                            existing = Word(strong=strong, original=originals, translation=translations)
+                            existing = Word(
+                                strong=strong,
+                                original=originals,
+                                translation=translations,
+                            )
                             session.add(existing)
                             # flush so the new row is visible to subsequent selects in this session
                             session.flush()
 
                         # ensure VerseWord association exists linking this verse and the (global) word
                         # store the canonical original and translation for this verse context
-                        link = session.exec(select(VerseWord).where(VerseWord.verse_id == v.id, VerseWord.word_id == strong)).first()
+                        link = session.exec(
+                            select(VerseWord).where(
+                                VerseWord.verse_id == v.id, VerseWord.word_id == strong
+                            )
+                        ).first()
                         if not link:
                             link = VerseWord(
                                 verse_id=v.id,
                                 word_id=strong,
                                 original=original or "",
-                                translation=translation or ""
+                                translation=translation or "",
                             )
                             session.add(link)
                             session.flush()
@@ -122,5 +145,5 @@ def import_all():
                     session.commit()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import_all()
