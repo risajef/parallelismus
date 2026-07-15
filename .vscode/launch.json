@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "Python: Debug fill_words",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "module": "backend.fill_words",
       "console": "integratedTerminal",
@@ -14,7 +14,7 @@
     },
     {
       "name": "Python: Debug import_strong",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "module": "backend.import_strong",
       "console": "integratedTerminal",
@@ -26,7 +26,7 @@
     ,
     {
       "name": "Uvicorn: backend.main",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/.venv/bin/uvicorn",
       "args": ["backend.main:app", "--reload", "--port", "8000"],
