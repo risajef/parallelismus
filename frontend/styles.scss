@@ -1,17 +1,17 @@
 // Structured SCSS for Parallelismus frontend
-$bg: #f7fafc;
-$card: #ffffff;
-$muted: #6b7280;
-$accent: #2563eb;
-$chip-bg: #f1f5f9;
-$radius: 10px;
-$shadow: 0 6px 18px rgba(15,23,42,0.06);
+$bg: var(--bg-main, #f7fafc);
+$card: var(--surface-card, #ffffff);
+$muted: var(--text-muted, #6b7280);
+$accent: var(--primary, #064E3B);
+$chip-bg: var(--bg-secondary, #f1f5f9);
+$radius: var(--radius-md, 10px);
+$shadow: var(--shadow-sm, 0 6px 18px rgba(15,23,42,0.06));
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  background: $bg; color: #0f172a; margin: 0;
+  font-family: var(--font-sans, Inter, sans-serif);
+  background: $bg; color: var(--text-main, #0f172a); margin: 0;
 }
 
 .wrap {
