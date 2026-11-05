@@ -32,3 +32,14 @@ Legacy SQLite follow-up: seed and importer apply additive schema upgrades themse
 Composition follow-up: distinct member sets may share members at the same evidence verse. Uniqueness includes assertion identity; upgrading the earlier SQLite constraint preserves rows and enables overlapping assertions. Tests ensure deleting one group leaves the other intact.
 
 Backup follow-up: importing the same backup in merge mode is idempotent. Duplicate assertions in a replacement fail atomically, and an actual legacy IndexedDB-record migration is covered by regression.
+
+## Final verification
+
+- 17 JavaScript regressions passed, including IndexedDB rollback, actual legacy-record migration, idempotent backup merge, evidence selection and adapter contracts.
+- 11 Python regressions passed with temporary databases, including authorization, schema upgrades, interrupted import/retry, repeatable seed and compositions.
+- Chromium checks passed for standalone and embedded operation, correct evidence and source navigation, cold concordance usages, host DOM/style isolation, and authenticated backend editing.
+- A clean offline `npm ci` followed by tests and the complete build passed. All 1,225 generated files matched the working build byte for byte.
+- PNG export with two different relation types between the same nodes passed.
+- CI configuration is committed; a remote CI run requires a future push. Nothing has been pushed or published, and no parent repository or submodule-pointer commit was made.
+
+The backend now needs an operator-configured write token; this is a shared trusted-editor credential, not individual user accounts. Existing data upgrades are covered by fixtures rather than running against a user's database. README documents backup, upgrade and test commands.
