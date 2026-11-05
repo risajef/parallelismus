@@ -3,12 +3,12 @@ import json
 from tempfile import TemporaryDirectory
 from pathlib import Path
 from sqlmodel import Session, SQLModel, select
-from .database import engine
+from .database import engine, create_db_and_tables
 from .models import Relation, Verse, Chapter, Book
 from .import_strong import import_book
 
 def seed(db_engine=engine):
-    SQLModel.metadata.create_all(db_engine)
+    create_db_and_tables(db_engine)
     with TemporaryDirectory() as tmp:
         file = Path(tmp) / 'sample.json'
         file.write_text(json.dumps([

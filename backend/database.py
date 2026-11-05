@@ -14,10 +14,10 @@ if DATABASE_URL.startswith('sqlite:'):
         connection.execute('PRAGMA foreign_keys=ON')
 
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-    if DATABASE_URL.startswith('sqlite:'):
-        with engine.begin() as connection:
+def create_db_and_tables(db_engine=engine):
+    SQLModel.metadata.create_all(db_engine)
+    if db_engine.dialect.name == 'sqlite':
+        with db_engine.begin() as connection:
             verse_columns = {row[1] for row in connection.exec_driver_sql('PRAGMA table_info(verseword)')}
             if 'position' not in verse_columns:
                 connection.exec_driver_sql('ALTER TABLE verseword ADD COLUMN position INTEGER NOT NULL DEFAULT 0')

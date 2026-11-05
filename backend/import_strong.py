@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from sqlmodel import Session, SQLModel, select
-from .database import engine
+from .database import engine, create_db_and_tables
 from .models import Book, Chapter, Verse, Word, VerseWord
 
 BASE = Path(__file__).resolve().parents[1] / 'bible'
@@ -51,7 +51,12 @@ def import_book(file, db_engine=engine):
             verse = session.exec(select(Verse).where(Verse.chapter_id == chapter.id, Verse.number == verse_no)).one_or_none()
             if verse is None:
                 verse = Verse(chapter_id=chapter.id, number=verse_no); session.add(verse); session.flush()
-            links = {w.position:w for w in session.exec(select(VerseWord).where(VerseWord.verse_id == verse.id))}
+            # Old imports had no token positions. Rebuild associations from the canonical
+            # verse inside this same transaction, retaining verse IDs and annotations.
+            for link in session.exec(select(VerseWord).where(VerseWord.verse_id == verse.id)):
+                session.delete(link)
+            session.flush()
+            links = {}
             for position, token in enumerate(entry.get('verse') or []):
                 if not isinstance(token, dict):
                     continue
@@ -76,7 +81,7 @@ def import_book(file, db_engine=engine):
             session.flush()
 
 def import_all(base=BASE, db_engine=engine):
-    SQLModel.metadata.create_all(db_engine)
+    create_db_and_tables(db_engine)
     for file in sorted(Path(base).glob('*.json')):
         print('Importing', file.name)
         import_book(file, db_engine)

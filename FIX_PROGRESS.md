@@ -26,3 +26,5 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Isolated tests, graph export, CI | Complete | Safe diagnostic import, multigraph export, subrepo CI, 15 JavaScript and 9 Python tests plus standalone/embedded/backend browser smoke checks. |
 
 Browser follow-up: single-verse rendering now retains evidence identity as well as whole-chapter rendering. The browser smoke suite caught the missing argument during source navigation.
+
+Legacy SQLite follow-up: seed and importer apply additive schema upgrades themselves. Reimport rebuilds token associations transactionally so legacy rows with no positions cannot leave duplicate occurrences. Regression covers upgrading and rerunning without first starting the server.
