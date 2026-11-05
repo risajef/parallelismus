@@ -67,7 +67,11 @@ function openRelationsDB() {
                 store.createIndex('target_id', 'target_id', { unique: false });
             }
         };
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+            req.result.onversionchange = () => {req.result.close();_db = null;_initPromise = null;};
+            resolve(req.result);
+        };
+        req.onblocked = () => reject(new Error('Close other Parallelismus tabs and retry the database upgrade'));
         req.onerror = () => reject(req.error);
     });
 }
@@ -134,7 +138,7 @@ export async function initDB(onProgress) {
         _db = await openRelationsDB();
         await migrateRelationReferences();
         if (onProgress) onProgress('Ready.');
-    })();
+    })().catch(err => { _initPromise = null; throw err; });
     return _initPromise;
 }
 
@@ -306,6 +310,7 @@ export async function addRelations(payloads) {
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
         tx.oncomplete = () => resolve(records);
+        tx.onerror = () => {};
         tx.onabort = () => reject(tx.error || new Error('Relation write aborted'));
         const store = tx.objectStore('relations');
         store.getAll().onsuccess = ev => {

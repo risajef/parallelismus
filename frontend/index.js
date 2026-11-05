@@ -132,11 +132,15 @@ async function boot() {
             if (loadingEl) loadingEl.textContent = msg;
         });
         if (loadingEl) loadingEl.style.display = 'none';
-        initFromHash();
+        await initFromHash();
     } catch (err) {
         console.error('DB init failed', err);
         if (loadingEl) loadingEl.textContent = 'Failed to initialise database: ' + String(err);
-        if (resultEl) resultEl.textContent = 'Failed to initialise database: ' + String(err);
+        if (resultEl) {
+            resultEl.textContent = 'Failed to initialise database: ' + String(err);
+            const retry = document.createElement('button');retry.textContent = 'Retry';
+            retry.addEventListener('click', () => {retry.remove();boot();});resultEl.appendChild(retry);
+        }
     }
 }
 

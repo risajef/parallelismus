@@ -20,7 +20,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Atomic composition identity | Complete | Group IDs, transactional creation/deletion in both adapters; rollback and whole-group deletion tests. |
 | Repeated token preservation | Complete | Preserve each token and position in browser corpus and SQLite; repeated-Strong retry regression. |
 | Lazy loading and relation queries | Complete | In-flight chapter promises, retries, indexed relation queries and one chapter badge refresh; concurrency/self-edge tests. |
-| HTTP errors and initialization recovery | Pending | |
+| HTTP errors and initialization recovery | Complete | Checked JSON HTTP adapter, retryable initialization, blocked-upgrade/version-change handling; error and retry regressions. |
 | Embedded DOM and style isolation | Pending | |
 | Safe HTML rendering | Pending | |
 | Isolated tests, graph export, CI | Pending | |
