@@ -1,5 +1,5 @@
 const configuredBase = globalThis.window?.__PARALLELISMUS_BASE__;
-const base = configuredBase || new URL('./', globalThis.document?.currentScript?.src || globalThis.location?.href || 'http://localhost/').href;
+const base = configuredBase || (globalThis.document?.querySelector?.('base')?.href) || new URL('./', globalThis.document?.currentScript?.src || globalThis.location?.href || 'http://localhost/').href;
 export function pageUrl(name, hash = '') {
     const url = new URL(name, base);
     url.hash = hash;

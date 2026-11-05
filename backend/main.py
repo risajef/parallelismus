@@ -368,7 +368,7 @@ def strong_search(q: str, request: Request):
         rows = session.exec(_select(Word)).all()
         out = []
         for w in rows:
-            matched = False
+            matched = term in w.strong.lower()
             # check translations
             for t in w.translation or []:
                 if t and term in t.lower():

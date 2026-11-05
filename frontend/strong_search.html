@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <base href="/static/" />
     <meta charset="utf-8" />
-    <title>Strong search</title>
+    <title>Search Strong</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
     <style>
       body {
         font-family: Inter, system-ui, Arial;
@@ -53,15 +54,19 @@
         Search translations or originals; substring and case-insensitive
         matching.
       </p>
+      <p><a href="index.html">← Back to app</a></p>
+      <div id="loading-status" style="padding: 8px; color: #6b7280">
+        Initialising…
+      </div>
       <div style="display: flex; gap: 8px; align-items: center">
         <input
           id="q"
-          placeholder="Search translations (e.g. 'word', 'sayings', 'the word')"
+          placeholder="Search translations (e.g. 'word', 'sayings')"
         />
         <button id="go">Search</button>
       </div>
       <div id="results" style="margin-top: 12px"></div>
     </div>
-    <script type="module" src="/static/strong_search.js"></script>
+    <script type="module" src="strong_search.js"></script>
   </body>
 </html>

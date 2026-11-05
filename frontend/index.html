@@ -1,17 +1,35 @@
 <!DOCTYPE html>
-<html data-theme="emerald">
+<html>
   <head>
+    <base href="/static/" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Parallelismus Demo</title>
-    <link rel="stylesheet" href="../../theme/risajef-theme.css" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>Parallelismus</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="rjs-styled">
+  <body>
     <div class="wrap">
       <header>
-        <h1>Parallelismus Demo</h1>
+        <h1>Parallelismus</h1>
+        <nav
+          style="display: flex; gap: 10px; margin-left: auto; font-size: 0.9rem"
+        >
+          <a href="strong_search.html">Search Strong</a>
+          <a href="graph.html">Graph</a>
+        </nav>
       </header>
+
+      <div
+        id="loading-status"
+        style="padding: 12px; text-align: center; color: #6b7280"
+      >
+        Initialising database…
+      </div>
+
       <div class="app-shell">
         <div class="main-column">
           <div class="card controls">
@@ -57,13 +75,12 @@
           </div>
 
           <div class="card" id="add-relation-panel">
-            <div class="add-relation-form">
-              <label>Write token <input id="write-token" type="password" autocomplete="off" placeholder="Required for backend writes" /></label>
+            <div class="add-relation-form"><label>Write token <input id="write-token" type="password" autocomplete="off" /></label>
               <label class="form-label"
                 >Relation type
                 <select id="type">
-                  <option value="">— select —</option>
-                  <option value="composes">composes (a,b,c → set)</option>
+                  <option value="">- select -</option>
+                  <option value="composes">composes (a,b,c -> set)</option>
                   <option value="opposite">opposite</option>
                   <option value="similar">similar</option>
                   <option value="element_of">element of</option>
@@ -102,10 +119,28 @@
               <div id="result"></div>
             </div>
           </div>
+
+          <div class="card" id="data-panel" hidden>
+            <h4 style="margin: 0 0 8px 0; font-size: 0.9rem; color: #6b7280">
+              Data Management
+            </h4>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <button id="exportRelations" title="Download relations as JSON">
+                ⬇ Export Relations
+              </button>
+              <label>Import mode <select id="import-mode"><option value="merge">Merge with existing</option><option value="replace">Replace all existing</option></select></label>
+              <button
+                id="importRelations"
+                title="Load relations from a JSON file"
+              >
+                ⬆ Import Relations
+              </button>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
 
-    <script type="module" src="/static/index.js"></script>
+    <script type="module" src="index.js"></script>
   </body>
 </html>

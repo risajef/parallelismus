@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <base href="/static/" />
     <meta charset="utf-8" />
     <title>Strong definition</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
     <style>
       :root {
         --bg: #f7fafc;
@@ -41,16 +42,39 @@
   </head>
   <body>
     <div class="wrap card">
+      <p>
+        <a href="index.html">← Back to app</a> |
+        <a href="strong_search.html">Search</a>
+      </p>
       <h1 id="strong-id">Strong</h1>
+      <div id="loading-status" style="padding: 8px; color: #6b7280">
+        Initialising…
+      </div>
       <div id="variants"></div>
       <div id="usages" style="margin-top: 12px"></div>
       <div id="relations" style="margin-top: 12px"></div>
     </div>
     <script type="module">
-      import * as api from '/static/app.js'
-      import { transliterate } from '/static/app.js'
-      const strong = location.pathname.split('/').pop()
+      import * as api from './app.js'
+      import { transliterate } from './app.js'
+
+      const loadingEl = document.getElementById('loading-status')
+      const strong = location.hash.replace(/^#/, '') || decodeURIComponent(location.pathname.split('/').pop()) || 'unknown'
       document.getElementById('strong-id').textContent = strong
+
+      ;(async () => {
+        try {
+          await api.initDB(msg => {
+            if (loadingEl) loadingEl.textContent = msg
+          })
+          if (loadingEl) loadingEl.style.display = 'none'
+          await load()
+        } catch (err) {
+          if (loadingEl)
+            loadingEl.textContent = 'DB init failed: ' + String(err)
+        }
+      })()
+
       async function load() {
         const [detail, rels] = await Promise.allSettled([
           api.fetchWordDetail(strong),
@@ -59,22 +83,30 @@
         const vEl = document.getElementById('variants')
         if (detail.status === 'fulfilled') {
           const d = detail.value
-          vEl.innerHTML = `<h3>Variants</h3>`
-          vEl.innerHTML += `<strong>All translations:</strong> <ul>${d.all_translations
-            .map(t => `<li>${t}</li>`)
-            .join('')}</ul>`
-          // show originals with transliteration if available
-          vEl.innerHTML += `<strong>All originals (with transliteration):</strong> <ul>${d.all_originals
-            .map(o => {
-              const tr = transliterate(o || '')
-              return `<li>${o}${
-                tr
-                  ? ` — <em style="font-style:italic;color:#6b7280;margin-left:6px">${tr}</em>`
-                  : ''
-              }</li>`
-            })
-            .join('')}</ul>`
-          // usages
+          vEl.innerHTML = '<h3>Variants</h3>'
+          vEl.innerHTML +=
+            '<strong>All translations:</strong> <ul>' +
+            d.all_translations.map(t => '<li>' + t + '</li>').join('') +
+            '</ul>'
+          vEl.innerHTML +=
+            '<strong>All originals (with transliteration):</strong> <ul>' +
+            d.all_originals
+              .map(o => {
+                const tr = transliterate(o || '')
+                return (
+                  '<li>' +
+                  o +
+                  (tr
+                    ? ' — <em style="font-style:italic;color:#6b7280;margin-left:6px">' +
+                      tr +
+                      '</em>'
+                    : '') +
+                  '</li>'
+                )
+              })
+              .join('') +
+            '</ul>'
+
           const uEl = document.getElementById('usages')
           uEl.innerHTML = '<h3>Usages</h3>'
           if (d.usages && d.usages.length) {
@@ -82,10 +114,21 @@
             d.usages.forEach(u => {
               const li = document.createElement('li')
               const a = document.createElement('a')
-              a.href = `/book/${u.book_id}/chapter/${u.chapter_id}/verse/${u.verse_id}`
-              a.textContent = `${u.book_name} ${u.chapter_number}:${
-                u.verse_number
-              } — ${u.verse_translation || u.verse_original || ''}`
+              a.href =
+                'index.html#/book/' +
+                u.book_id +
+                '/chapter/' +
+                u.chapter_id +
+                '/verse/' +
+                u.verse_id
+              a.textContent =
+                u.book_name +
+                ' ' +
+                u.chapter_number +
+                ':' +
+                u.verse_number +
+                ' — ' +
+                (u.verse_translation || u.verse_original || '')
               a.target = '_blank'
               li.appendChild(a)
               list.appendChild(li)
@@ -95,9 +138,8 @@
             uEl.innerHTML += '<div>(no usages found)</div>'
           }
         } else {
-          vEl.innerHTML = `<div>Failed to load detail: ${String(
-            detail.reason
-          )}</div>`
+          vEl.innerHTML =
+            '<div>Failed to load detail: ' + String(detail.reason) + '</div>'
         }
 
         const rEl = document.getElementById('relations')
@@ -106,8 +148,6 @@
           const relList = document.createElement('ul')
           relList.style.listStyle = 'none'
           relList.style.padding = '0'
-          relList.style.margin = '0'
-          // build a quick lookup from usage verse_id => usage record when possible
           const usageMap = {}
           if (
             detail.status === 'fulfilled' &&
@@ -121,31 +161,38 @@
           rels.value.forEach(r => {
             const li = document.createElement('li')
             const srcLink = document.createElement('a')
-            srcLink.href = `/strong/${encodeURIComponent(r.source_id)}`
+            srcLink.href = 'strong.html#' + encodeURIComponent(r.source_id)
             srcLink.textContent = r.source_id
             srcLink.target = '_blank'
             const tgtLink = document.createElement('a')
-            tgtLink.href = `/strong/${encodeURIComponent(r.target_id)}`
+            tgtLink.href = 'strong.html#' + encodeURIComponent(r.target_id)
             tgtLink.textContent = r.target_id
             tgtLink.target = '_blank'
             li.appendChild(srcLink)
-            li.appendChild(document.createTextNode(` → ${r.relation_type} → `))
+            li.appendChild(
+              document.createTextNode(' → ' + r.relation_type + ' → ')
+            )
             li.appendChild(tgtLink)
-            // if this relation has a source_verse_id, try to resolve it to a human-friendly book/chapter/verse link
             if (r.source_verse_id) {
               const key = String(r.source_verse_id)
               if (usageMap[key]) {
                 const u = usageMap[key]
                 const sv = document.createElement('a')
-                sv.href = `/book/${u.book_id}/chapter/${u.chapter_id}/verse/${u.verse_id}`
-                sv.textContent = ` (Source: ${u.book_name} ${u.chapter_number}:${u.verse_number})`
-                sv.style.marginLeft = '8px'
-                sv.target = '_blank'
-                li.appendChild(sv)
-              } else {
-                const sv = document.createElement('a')
-                sv.href = `/book/${r.source_verse_id}/chapter/0/verse/${r.source_verse_id}`
-                sv.textContent = ` (Source: Link ${r.source_verse_id})`
+                sv.href =
+                  'index.html#/book/' +
+                  u.book_id +
+                  '/chapter/' +
+                  u.chapter_id +
+                  '/verse/' +
+                  u.verse_id
+                sv.textContent =
+                  ' (Source: ' +
+                  u.book_name +
+                  ' ' +
+                  u.chapter_number +
+                  ':' +
+                  u.verse_number +
+                  ')'
                 sv.style.marginLeft = '8px'
                 sv.target = '_blank'
                 li.appendChild(sv)
@@ -155,12 +202,10 @@
           })
           rEl.appendChild(relList)
         } else {
-          rEl.innerHTML = `<div>Failed to load relations: ${String(
-            rels.reason
-          )}</div>`
+          rEl.innerHTML =
+            '<div>Failed to load relations: ' + String(rels.reason) + '</div>'
         }
       }
-      load()
     </script>
   </body>
 </html>
