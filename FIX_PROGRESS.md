@@ -23,6 +23,6 @@ Each completed entry is committed separately. The commit containing an entry is 
 | HTTP errors and initialization recovery | Complete | Checked JSON HTTP adapter, retryable initialization, blocked-upgrade/version-change handling; error and retry regressions. |
 | Embedded DOM and style isolation | Complete | Root-scoped CSS, IDs, selection and keyboard handlers; disposable global listeners; no parent loader changes. |
 | Safe HTML rendering | Complete | Variant text rendered with DOM text nodes; error text safe; adjacent-character escaping regression. |
-| Isolated tests, graph export, CI | Pending | |
+| Isolated tests, graph export, CI | Complete | Safe diagnostic import, multigraph export, subrepo CI, 15 JavaScript and 9 Python tests plus standalone/embedded/backend browser smoke checks. |
 
 Browser follow-up: single-verse rendering now retains evidence identity as well as whole-chapter rendering. The browser smoke suite caught the missing argument during source navigation.

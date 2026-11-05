@@ -76,8 +76,8 @@ def load_relations(conn: sqlite3.Connection, relation_type: str | None, limit: i
     return conn.execute(query, params)
 
 
-def build_graph(rows: Iterable[Tuple[str, str, str]], labels: Dict[str, str]) -> nx.DiGraph:
-    graph = nx.DiGraph()
+def build_graph(rows: Iterable[Tuple[str, str, str]], labels: Dict[str, str]) -> nx.MultiDiGraph:
+    graph = nx.MultiDiGraph()
     for source_id, target_id, relation_type in rows:
         if not source_id or not target_id:
             continue
@@ -87,7 +87,7 @@ def build_graph(rows: Iterable[Tuple[str, str, str]], labels: Dict[str, str]) ->
     return graph
 
 
-def draw_graph(graph: nx.DiGraph, output: Path, layout: str) -> None:
+def draw_graph(graph: nx.MultiDiGraph, output: Path, layout: str) -> None:
     if len(graph) == 0:
         print("No relations found with the current filters.")
         return
@@ -103,7 +103,7 @@ def draw_graph(graph: nx.DiGraph, output: Path, layout: str) -> None:
     relation_types = sorted(set(edge_attrs.values()))
     cmap = plt.get_cmap('tab20')
     color_map = {rtype: cmap(i % 20) for i, rtype in enumerate(relation_types)}
-    edge_colors = [color_map[edge_attrs[(u, v)]] for u, v in graph.edges]
+    edge_colors = [color_map[edge_attrs[(u, v, key)]] for u, v, key in graph.edges(keys=True)]
 
     nx.draw_networkx_nodes(graph, pos, node_color="#fef3c7", edgecolors="#fdba74", linewidths=1.5, node_size=850)
     nx.draw_networkx_edges(graph, pos, edge_color=edge_colors, arrows=True, arrowstyle='-|>', arrowsize=14, width=2)

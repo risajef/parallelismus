@@ -8,3 +8,4 @@ node_modules/
 styles.css
 README.md
 Description.md
+.pytest_cache/

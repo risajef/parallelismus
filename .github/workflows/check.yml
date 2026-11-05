@@ -1,0 +1,27 @@
+name: Check Parallelismus
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: git diff --exit-code -- dist
+      - run: python -m pip install -r backend/requirements-dev.txt -r tools/requirements.txt
+      - run: python -m pytest
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+      - run: npm run build:css
+      - run: npm run test:browser
+        env:
+          PYTHON_BIN: python
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
