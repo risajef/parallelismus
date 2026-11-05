@@ -50,7 +50,7 @@ async function doSearch() {
         results.innerHTML = '';
         results.appendChild(out);
     } catch (err) {
-        results.innerHTML = '<div>Error: ' + String(err) + '</div>';
+        results.textContent = 'Error: ' + String(err);
     }
 }
 

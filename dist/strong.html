@@ -56,6 +56,7 @@
     </div>
     <script type="module">
       import * as api from './app.js'
+      import {renderVariants} from './dom-utils.js'
       import { transliterate } from './app.js'
 
       const loadingEl = document.getElementById('loading-status')
@@ -83,29 +84,7 @@
         const vEl = document.getElementById('variants')
         if (detail.status === 'fulfilled') {
           const d = detail.value
-          vEl.innerHTML = '<h3>Variants</h3>'
-          vEl.innerHTML +=
-            '<strong>All translations:</strong> <ul>' +
-            d.all_translations.map(t => '<li>' + t + '</li>').join('') +
-            '</ul>'
-          vEl.innerHTML +=
-            '<strong>All originals (with transliteration):</strong> <ul>' +
-            d.all_originals
-              .map(o => {
-                const tr = transliterate(o || '')
-                return (
-                  '<li>' +
-                  o +
-                  (tr
-                    ? ' — <em style="font-style:italic;color:#6b7280;margin-left:6px">' +
-                      tr +
-                      '</em>'
-                    : '') +
-                  '</li>'
-                )
-              })
-              .join('') +
-            '</ul>'
+          renderVariants(vEl, d.all_translations, d.all_originals, transliterate)
 
           const uEl = document.getElementById('usages')
           uEl.innerHTML = '<h3>Usages</h3>'
@@ -138,8 +117,7 @@
             uEl.innerHTML += '<div>(no usages found)</div>'
           }
         } else {
-          vEl.innerHTML =
-            '<div>Failed to load detail: ' + String(detail.reason) + '</div>'
+          vEl.textContent = 'Failed to load detail: ' + String(detail.reason)
         }
 
         const rEl = document.getElementById('relations')
@@ -202,8 +180,7 @@
           })
           rEl.appendChild(relList)
         } else {
-          rEl.innerHTML =
-            '<div>Failed to load relations: ' + String(rels.reason) + '</div>'
+          rEl.textContent = 'Failed to load relations: ' + String(rels.reason)
         }
       }
     </script>

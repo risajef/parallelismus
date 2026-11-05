@@ -22,5 +22,5 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Lazy loading and relation queries | Complete | In-flight chapter promises, retries, indexed relation queries and one chapter badge refresh; concurrency/self-edge tests. |
 | HTTP errors and initialization recovery | Complete | Checked JSON HTTP adapter, retryable initialization, blocked-upgrade/version-change handling; error and retry regressions. |
 | Embedded DOM and style isolation | Complete | Root-scoped CSS, IDs, selection and keyboard handlers; disposable global listeners; no parent loader changes. |
-| Safe HTML rendering | Pending | |
+| Safe HTML rendering | Complete | Variant text rendered with DOM text nodes; error text safe; adjacent-character escaping regression. |
 | Isolated tests, graph export, CI | Pending | |

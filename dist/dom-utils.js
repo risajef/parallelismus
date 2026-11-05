@@ -10,7 +10,7 @@ export function setOptions(selectEl, items, valueKey, labelKey) {
 }
 export function escapeHtml(str) {
   if (str == null) return '';
-  return String(str).replace(/[&<>\"]+/g, function (s) {
+  return String(str).replace(/[&<>\"]/g, function (s) {
     switch (s) {
       case '&': return '&amp;';
       case '<': return '&lt;';
@@ -31,4 +31,18 @@ export function sampleRandom(arr, n) {
     if (!seen.has(i)) { seen.add(i); out.push(arr[i]); }
   }
   return out;
+}
+
+export function renderVariants(container, translations, originals, transliterate) {
+    container.replaceChildren();
+    for (const [heading,values] of [['Translations',translations],['Originals',originals]]) {
+        const title = document.createElement('h3');title.textContent = heading;container.appendChild(title);
+        const list = document.createElement('ul');
+        for (const value of values) {
+            const item = document.createElement('li');
+            const tr = heading === 'Originals' ? transliterate(value || '') : '';
+            item.textContent = String(value) + (tr ? ' — ' + tr : '');list.appendChild(item);
+        }
+        container.appendChild(list);
+    }
 }
