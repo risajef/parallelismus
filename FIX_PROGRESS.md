@@ -28,3 +28,5 @@ Each completed entry is committed separately. The commit containing an entry is 
 Browser follow-up: single-verse rendering now retains evidence identity as well as whole-chapter rendering. The browser smoke suite caught the missing argument during source navigation.
 
 Legacy SQLite follow-up: seed and importer apply additive schema upgrades themselves. Reimport rebuilds token associations transactionally so legacy rows with no positions cannot leave duplicate occurrences. Regression covers upgrading and rerunning without first starting the server.
+
+Composition follow-up: distinct member sets may share members at the same evidence verse. Uniqueness includes assertion identity; upgrading the earlier SQLite constraint preserves rows and enables overlapping assertions. Tests ensure deleting one group leaves the other intact.

@@ -24,6 +24,22 @@ def create_db_and_tables(db_engine=engine):
             columns = {row[1] for row in connection.exec_driver_sql('PRAGMA table_info(relation)')}
             if 'composition_id' not in columns:
                 connection.exec_driver_sql('ALTER TABLE relation ADD COLUMN composition_id VARCHAR')
+            # The original four-column UNIQUE constraint prevented overlapping
+            # n-ary assertions. Rebuild only that legacy table, preserving every row.
+            legacy_unique = False
+            for index in connection.exec_driver_sql('PRAGMA index_list(relation)').fetchall():
+                if index[2]:
+                    columns = [row[2] for row in connection.exec_driver_sql('PRAGMA index_info("' + index[1] + '")')]
+                    if columns == ['source_id','target_id','relation_type','source_verse_id']:
+                        legacy_unique = True
+            if legacy_unique:
+                connection.exec_driver_sql('CREATE TABLE relation_upgrade (id INTEGER PRIMARY KEY, source_id VARCHAR NOT NULL REFERENCES word(strong), target_id VARCHAR NOT NULL REFERENCES word(strong), relation_type VARCHAR NOT NULL, source_verse_id INTEGER REFERENCES verse(id), notes VARCHAR, composition_id VARCHAR)')
+                connection.exec_driver_sql('INSERT INTO relation_upgrade SELECT id,source_id,target_id,relation_type,source_verse_id,notes,composition_id FROM relation')
+                connection.exec_driver_sql('DROP TABLE relation')
+                connection.exec_driver_sql('ALTER TABLE relation_upgrade RENAME TO relation')
+            connection.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS relation_plain_evidence ON relation(source_id,target_id,relation_type,source_verse_id) WHERE composition_id IS NULL')
+            connection.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS relation_composition_member ON relation(composition_id,source_id) WHERE composition_id IS NOT NULL')
+
 
 
 def get_session() -> Generator[Session, None, None]:

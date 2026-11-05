@@ -546,10 +546,6 @@ def add_composition(command: CompositionCreate):
             raise HTTPException(422, 'Unknown evidence verse')
         if any(not session.get(Word, s) for s in [command.target_id, *command.members]):
             raise HTTPException(422, 'Unknown relation endpoint')
-        existing = session.exec(select(Relation).where(Relation.target_id == command.target_id,
-            Relation.relation_type == 'composes', Relation.source_verse_id == command.source_verse_id)).all()
-        if any(r.source_id in command.members for r in existing):
-            raise HTTPException(409, 'Composition member already exists at this evidence verse')
         rows = [Relation(source_id=s, target_id=command.target_id, relation_type='composes',
             source_verse_id=command.source_verse_id, composition_id=group) for s in command.members]
         session.add_all(rows);session.flush()

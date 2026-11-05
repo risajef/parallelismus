@@ -9,6 +9,7 @@ def test_composition_validation_and_atomic_delete(database):
     response=client.post('/compositions',json=command,headers=headers)
     assert response.status_code==200
     rows=response.json()
+    assert client.post('/compositions',json={**command,'members':['a']},headers=headers).status_code==200
     assert rows[0]['composition_id']==rows[1]['composition_id']
     assert client.delete('/relations/'+str(rows[0]['id']),headers=headers).status_code==409
     assert client.delete('/compositions/'+rows[0]['composition_id'],headers=headers).json()['deleted']==2

@@ -2,6 +2,7 @@ import pytest
 from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy import event
 from backend import main
+from backend.database import create_db_and_tables
 from backend.models import Book, Chapter, Verse, Word
 
 @pytest.fixture
@@ -10,7 +11,7 @@ def database(tmp_path, monkeypatch):
     @event.listens_for(engine, 'connect')
     def foreign_keys(connection, _):
         connection.execute('PRAGMA foreign_keys=ON')
-    SQLModel.metadata.create_all(engine)
+    create_db_and_tables(engine)
     monkeypatch.setattr(main, 'engine', engine)
     monkeypatch.setenv('PARALLELISMUS_WRITE_TOKEN', 'test-secret')
     with Session(engine) as session:

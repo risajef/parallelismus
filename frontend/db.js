@@ -303,7 +303,7 @@ function validateRelation(payload) {
     return {source_id:payload.source_id, target_id:payload.target_id, relation_type:payload.relation_type,
         source_verse_id:payload.source_verse_id, source_verse_key: _verses.find(v => v.id === payload.source_verse_id)?.key ?? String(payload.source_verse_id), notes:payload.notes ?? null, composition_id: payload.composition_id ?? null};
 }
-function relationKey(r) { return JSON.stringify([r.source_id,r.target_id,r.relation_type,r.source_verse_id]); }
+function relationKey(r) { return JSON.stringify([r.source_id,r.target_id,r.relation_type,r.source_verse_id,r.composition_id ?? null]); }
 
 export async function addRelations(payloads) {
     const records = payloads.map(validateRelation);

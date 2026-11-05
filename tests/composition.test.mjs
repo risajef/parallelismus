@@ -7,7 +7,9 @@ test('composition members share identity and save or delete together',async()=>{
     assert.equal(JSON.parse(await api.exportRelations()).relations.length,0);
     const rows=await api.addComposition(['a','b'],'c',1);
     assert.equal(rows[0].composition_id,rows[1].composition_id);
+    const other=await api.addComposition(['a'],'c',1);
     await assert.rejects(api.deleteRelation(rows[0].id));
     await api.deleteComposition(rows[0].composition_id);
-    assert.equal(JSON.parse(await api.exportRelations()).relations.length,0);
+    assert.equal(JSON.parse(await api.exportRelations()).relations.length,1);
+    assert.equal(JSON.parse(await api.exportRelations()).relations[0].composition_id,other[0].composition_id);
 });

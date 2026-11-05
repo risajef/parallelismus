@@ -22,3 +22,17 @@ def test_legacy_schema_and_unpositioned_tokens_upgrade_without_starting_server(t
         assert [(r.position,r.word_id) for r in rows]==[(0,'a'),(1,'b')]
     create_db_and_tables(engine)
     engine.dispose()
+
+
+def test_original_relation_constraint_upgrades_preserving_rows(database):
+    from backend.models import Relation
+    with database.begin() as connection:
+        connection.exec_driver_sql('DROP TABLE relation')
+        connection.exec_driver_sql("CREATE TABLE relation (id INTEGER PRIMARY KEY,source_id VARCHAR,target_id VARCHAR,relation_type VARCHAR,source_verse_id INTEGER,notes VARCHAR, UNIQUE(source_id,target_id,relation_type,source_verse_id))")
+        connection.exec_driver_sql("INSERT INTO relation VALUES (1,'a','b','similar',1,'existing annotation')")
+    create_db_and_tables(database)
+    with Session(database) as session:
+        assert session.get(Relation,1).notes=='existing annotation'
+        session.add_all([Relation(source_id='a',target_id='c',relation_type='composes',source_verse_id=1,composition_id=g) for g in ['first','second']])
+        session.commit()
+        assert len(session.exec(select(Relation)).all())==3

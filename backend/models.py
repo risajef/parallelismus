@@ -64,7 +64,7 @@ class Word(SQLModel, table=True):
 
 
 class Relation(SQLModel, table=True):
-    __table_args__ = (UniqueConstraint('source_id', 'target_id', 'relation_type', 'source_verse_id', name='relation_evidence_unique'),)
+    __table_args__ = (UniqueConstraint('source_id', 'target_id', 'relation_type', 'source_verse_id', 'composition_id', name='relation_evidence_unique'),)
     id: Optional[int] = Field(default=None, primary_key=True)
     source_id: str = Field(foreign_key="word.strong")
     target_id: str = Field(foreign_key="word.strong")
