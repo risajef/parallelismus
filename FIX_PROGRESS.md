@@ -21,6 +21,6 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Repeated token preservation | Complete | Preserve each token and position in browser corpus and SQLite; repeated-Strong retry regression. |
 | Lazy loading and relation queries | Complete | In-flight chapter promises, retries, indexed relation queries and one chapter badge refresh; concurrency/self-edge tests. |
 | HTTP errors and initialization recovery | Complete | Checked JSON HTTP adapter, retryable initialization, blocked-upgrade/version-change handling; error and retry regressions. |
-| Embedded DOM and style isolation | Pending | |
+| Embedded DOM and style isolation | Complete | Root-scoped CSS, IDs, selection and keyboard handlers; disposable global listeners; no parent loader changes. |
 | Safe HTML rendering | Pending | |
 | Isolated tests, graph export, CI | Pending | |

@@ -1,3 +1,5 @@
+.parallelismus-app {
+  [hidden] { display: none !important; }
 // Structured SCSS for Parallelismus frontend
 $bg: var(--bg-main, #f7fafc);
 $card: var(--surface-card, #ffffff);
@@ -8,8 +10,8 @@ $radius: var(--radius-md, 10px);
 $shadow: var(--shadow-sm, 0 6px 18px rgba(15,23,42,0.06));
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
+
+& {
   font-family: var(--font-sans, Inter, sans-serif);
   background: $bg; color: var(--text-main, #0f172a); margin: 0;
 }
@@ -164,4 +166,6 @@ header {
   .add-relation-form {
     select, input { font-size: 1rem; }
   }
+}
+
 }

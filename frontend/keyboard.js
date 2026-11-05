@@ -1,6 +1,7 @@
-export function installShortcuts(shortcutBtn, tooltipApi, buildShortcutHtml) {
+export function installShortcuts(shortcutBtn, tooltipApi, buildShortcutHtml, root = document) {
+  const getById = id => root.querySelector('#' + CSS.escape(id));
   function isComposeMode() {
-    const typeEl = document.getElementById('type');
+    const typeEl = getById('type');
     return typeEl && typeEl.value === 'composes';
   }
 
@@ -20,21 +21,21 @@ export function installShortcuts(shortcutBtn, tooltipApi, buildShortcutHtml) {
     });
   }
   // global keyboard shortcuts (Alt+S/T/R, Alt+Enter)
-  document.addEventListener('keydown', (ev) => {
+  root.addEventListener('keydown', (ev) => {
     if (!ev.altKey) return;
     const code = ev.key.toLowerCase();
     if (code === 's') {
       ev.preventDefault();
-      if (isComposeMode()) document.getElementById('member-input')?.focus();
-      else document.getElementById('src')?.focus();
+      if (isComposeMode()) getById('member-input')?.focus();
+      else getById('src')?.focus();
     } else if (code === 't') {
       ev.preventDefault();
-      if (isComposeMode()) document.getElementById('compose-target')?.focus();
-      else document.getElementById('tgt')?.focus();
+      if (isComposeMode()) getById('compose-target')?.focus();
+      else getById('tgt')?.focus();
     } else if (code === 'r') {
-      ev.preventDefault(); document.getElementById('type')?.focus();
+      ev.preventDefault(); getById('type')?.focus();
     } else if (ev.key === 'Enter') {
-      ev.preventDefault(); document.getElementById('addRel')?.click();
+      ev.preventDefault(); getById('addRel')?.click();
     }
   });
 }

@@ -6,22 +6,32 @@ import { createOption, setOptions, escapeHtml, sampleRandom } from './dom-utils.
 import { makeStaticTooltip, buildTranslationGrid, buildShortcutHtml } from './tooltip.js';
 import { installShortcuts } from './keyboard.js';
 
+// Scope DOM access to this instance; parent pages may contain the same IDs.
+const appRoot = document.querySelector('#parallelismus-root .parallelismus-app') || document.querySelector('.parallelismus-app');
+const lifecycle = new AbortController();
+appRoot.parallelismusDispose?.();
+appRoot.parallelismusDispose = () => lifecycle.abort();
+const root = {
+    getElementById: id => appRoot.querySelector('#' + CSS.escape(id)),
+    querySelectorAll: selector => appRoot.querySelectorAll(selector),
+};
+
 // DOM references
-const booksEl = document.getElementById('books');
-const chaptersEl = document.getElementById('chapters');
-const versesEl = document.getElementById('verses');
-const wordsEl = document.getElementById('words');
-const resultEl = document.getElementById('result');
-const nextChapterBtn = document.getElementById('next-chapter');
-const nextVerseBtn = document.getElementById('next-verse');
-const loadingEl = document.getElementById('loading-status');
-const typeEl = document.getElementById('type');
-const binaryFields = document.getElementById('binary-fields');
-const composeFields = document.getElementById('compose-fields');
-const membersList = document.getElementById('members-list');
-const memberInput = document.getElementById('member-input');
-const addMemberBtn = document.getElementById('add-member');
-const composeTargetEl = document.getElementById('compose-target');
+const booksEl = root.getElementById('books');
+const chaptersEl = root.getElementById('chapters');
+const versesEl = root.getElementById('verses');
+const wordsEl = root.getElementById('words');
+const resultEl = root.getElementById('result');
+const nextChapterBtn = root.getElementById('next-chapter');
+const nextVerseBtn = root.getElementById('next-verse');
+const loadingEl = root.getElementById('loading-status');
+const typeEl = root.getElementById('type');
+const binaryFields = root.getElementById('binary-fields');
+const composeFields = root.getElementById('compose-fields');
+const membersList = root.getElementById('members-list');
+const memberInput = root.getElementById('member-input');
+const addMemberBtn = root.getElementById('add-member');
+const composeTargetEl = root.getElementById('compose-target');
 
 let currentChapters = [];
 let currentVerses = [];
@@ -49,7 +59,7 @@ function addMemberChip(strong) {
     removeBtn.textContent = 'x';
     removeBtn.addEventListener('click', () => {
         chip.remove();
-        document.querySelectorAll(`.word-box[data-strong="${CSS.escape(strong)}"]`).forEach((el) => el.classList.remove('selected'));
+        root.querySelectorAll(`.word-box[data-strong="${CSS.escape(strong)}"]`).forEach((el) => el.classList.remove('selected'));
         syncWordSelection();
     });
 
@@ -65,16 +75,16 @@ function getComposeMembers() {
 }
 
 function clearRelationSelection() {
-    document.querySelectorAll('.word-box.selected').forEach((el) => el.classList.remove('selected'));
-    const srcEl = document.getElementById('src');
-    const tgtEl = document.getElementById('tgt');
+    root.querySelectorAll('.word-box.selected').forEach((el) => el.classList.remove('selected'));
+    const srcEl = root.getElementById('src');
+    const tgtEl = root.getElementById('tgt');
     if (srcEl) srcEl.value = '';
     if (tgtEl) tgtEl.value = '';
     if (membersList) membersList.innerHTML = '';
 }
 
 function syncWordSelection() {
-    const selected = Array.from(document.querySelectorAll('.word-box.selected'));
+    const selected = Array.from(root.querySelectorAll('.word-box.selected'));
 
     if (isComposeMode()) {
         if (membersList) membersList.innerHTML = '';
@@ -89,9 +99,9 @@ function syncWordSelection() {
         selected.slice(2).forEach((el) => el.classList.remove('selected'));
     }
 
-    const trimmed = Array.from(document.querySelectorAll('.word-box.selected'));
-    const srcEl = document.getElementById('src');
-    const tgtEl = document.getElementById('tgt');
+    const trimmed = Array.from(root.querySelectorAll('.word-box.selected'));
+    const srcEl = root.getElementById('src');
+    const tgtEl = root.getElementById('tgt');
     if (srcEl) srcEl.value = trimmed[0]?.dataset.strong || '';
     if (tgtEl) tgtEl.value = trimmed[1]?.dataset.strong || '';
 }
@@ -175,7 +185,7 @@ function parseHash() {
     return result;
 }
 
-window.addEventListener('hashchange', () => initFromHash());
+window.addEventListener('hashchange', () => initFromHash(), {signal:lifecycle.signal});
 
 // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -375,7 +385,7 @@ async function markWordsWithRelations(strongIds) {
         try { counts = await api.fetchRelationsCounts(strongIds); } catch (e) { counts = {}; }
         for (const id of strongIds) {
             const has = !!map[id];
-            const els = document.querySelectorAll(`.word-box[data-strong="${CSS.escape(id)}"]`);
+            const els = root.querySelectorAll(`.word-box[data-strong="${CSS.escape(id)}"]`);
             const c = counts[id] ? Number(counts[id]) : 0;
             els.forEach(el => {
                 if (has) el.classList.add('has-relation'); else el.classList.remove('has-relation');
@@ -393,8 +403,8 @@ async function markWordsWithRelations(strongIds) {
 
 // ── Side panels: relations, add-relation, drag-drop ─────────────────────────
 
-const addPanel = document.getElementById('add-relation-panel');
-const relationsPanel = document.getElementById('relations-panel');
+const addPanel = root.getElementById('add-relation-panel');
+const relationsPanel = root.getElementById('relations-panel');
 
 function allowDrop(ev) { ev.preventDefault(); }
 function handleAddDrop(ev) {
@@ -418,8 +428,8 @@ function handleAddDrop(ev) {
         return;
     }
 
-    const srcEl = document.getElementById('src');
-    const tgtEl = document.getElementById('tgt');
+    const srcEl = root.getElementById('src');
+    const tgtEl = root.getElementById('tgt');
     let handled = false;
     try {
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -440,8 +450,8 @@ function handleRelationsDrop(ev) {
     ev.preventDefault();
     const strong = ev.dataTransfer.getData('text/plain');
     if (!strong) return;
-    document.getElementById('relations-strong').value = strong;
-    document.getElementById('showRelations').click();
+    root.getElementById('relations-strong').value = strong;
+    root.getElementById('showRelations').click();
     relationsPanel.classList.add('drop-target');
     setTimeout(() => relationsPanel.classList.remove('drop-target'), 350);
 }
@@ -451,11 +461,11 @@ addPanel.addEventListener('drop', handleAddDrop);
 relationsPanel.addEventListener('dragover', allowDrop);
 relationsPanel.addEventListener('drop', handleRelationsDrop);
 
-document.getElementById('showRelations').addEventListener('click', async () => {
-    const strong = document.getElementById('relations-strong').value.trim();
+root.getElementById('showRelations').addEventListener('click', async () => {
+    const strong = root.getElementById('relations-strong').value.trim();
     if (!strong) return;
     const groups = await api.fetchGroupedRelations(strong);
-    const list = document.getElementById('relations-list');
+    const list = root.getElementById('relations-list');
     list.innerHTML = '';
     for (const g of groups) {
         const li = document.createElement('li');
@@ -516,7 +526,7 @@ document.getElementById('showRelations').addEventListener('click', async () => {
                     const full = await api.fetchRelations(g.source_id);
                     for (const r of full.filter(r => !r.composition_id && r.source_id === g.source_id && r.target_id === g.target_id && r.relation_type === g.relation_type)) await api.deleteRelation(r.id);
                 }
-                document.getElementById('showRelations').click();
+                root.getElementById('showRelations').click();
             } catch (err) {
                 alert('Failed to remove relation(s): ' + String(err));
             }
@@ -528,7 +538,7 @@ document.getElementById('showRelations').addEventListener('click', async () => {
 
 // ── Tooltip ─────────────────────────────────────────────────────────────────
 
-const addRelPanel = document.getElementById('add-relation-panel');
+const addRelPanel = root.getElementById('add-relation-panel');
 const tooltipApi = makeStaticTooltip(addRelPanel);
 
 function handleMouseOver(ev) {
@@ -550,12 +560,12 @@ function handleMouseOut(ev) {
     if (fromRoot && fromRoot === toRoot) return;
     if (fromRoot) tooltipApi.hide();
 }
-document.body.addEventListener('mouseover', handleMouseOver);
-document.body.addEventListener('mouseout', handleMouseOut);
+appRoot.addEventListener('mouseover', handleMouseOver);
+appRoot.addEventListener('mouseout', handleMouseOut);
 
-installShortcuts(document.getElementById('shortcutInfo'), tooltipApi, buildShortcutHtml);
+installShortcuts(root.getElementById('shortcutInfo'), tooltipApi, buildShortcutHtml, appRoot);
 
-document.body.addEventListener('focusin', (ev) => {
+appRoot.addEventListener('focusin', (ev) => {
     const target = ev.target;
     if (target && target.classList && target.classList.contains('word-main')) {
         let originals = [];
@@ -567,7 +577,7 @@ document.body.addEventListener('focusin', (ev) => {
         tooltipApi.show(`<div class="tooltip-grid"><div class="tooltip-col"><h4>Translations</h4>${leftList}</div><div class="tooltip-col"><h4>Originals</h4>${rightList}</div></div>`);
     }
 });
-document.body.addEventListener('focusout', (ev) => {
+appRoot.addEventListener('focusout', (ev) => {
     const target = ev.target;
     if (target && target.classList && target.classList.contains('word-main')) tooltipApi.hide();
 });
@@ -613,14 +623,14 @@ versesEl.addEventListener('change', async () => {
 
 // ── Add relation ────────────────────────────────────────────────────────────
 
-document.getElementById('addRel').addEventListener('click', async () => {
+root.getElementById('addRel').addEventListener('click', async () => {
     const type = typeEl && typeEl.value ? typeEl.value.trim() : '';
     if (!type) { resultEl.textContent = 'Please select a relation type'; return; }
     const selectedVerseNumber = Number(versesEl.value || 0);
     const selectedVerse = currentVerses.find(v => Number(v.number) === selectedVerseNumber);
     let evidenceId;
     try {
-        evidenceId = evidenceVerse(Array.from(document.querySelectorAll('.word-box.selected')).map(el => el.dataset.verseId), selectedVerse?.id);
+        evidenceId = evidenceVerse(Array.from(root.querySelectorAll('.word-box.selected')).map(el => el.dataset.verseId), selectedVerse?.id);
         const evidence = currentVerses.find(v => v.id === evidenceId);
         if (evidence) versesEl.value = String(evidence.number);
     } catch (err) { resultEl.textContent = err.message; return; }
@@ -643,8 +653,8 @@ document.getElementById('addRel').addEventListener('click', async () => {
         return;
     }
 
-    const srcEl = document.getElementById('src');
-    const tgtEl = document.getElementById('tgt');
+    const srcEl = root.getElementById('src');
+    const tgtEl = root.getElementById('tgt');
     const src = srcEl && srcEl.value ? srcEl.value : '';
     const tgt = tgtEl && tgtEl.value ? tgtEl.value : '';
     if (!src || !tgt) { resultEl.textContent = 'Please select source and target words'; return; }
@@ -662,7 +672,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
 
 // ── Export / Import relations ───────────────────────────────────────────────
 
-document.getElementById('exportRelations').addEventListener('click', async () => {
+root.getElementById('exportRelations').addEventListener('click', async () => {
     try {
         const json = await api.exportRelations();
         const blob = new Blob([json], { type: 'application/json' });
@@ -678,7 +688,7 @@ document.getElementById('exportRelations').addEventListener('click', async () =>
     }
 });
 
-document.getElementById('importRelations').addEventListener('click', () => {
+root.getElementById('importRelations').addEventListener('click', () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -687,12 +697,12 @@ document.getElementById('importRelations').addEventListener('click', () => {
         if (!file) return;
         try {
             const text = await file.text();
-            const mode = document.getElementById('import-mode').value;
+            const mode = root.getElementById('import-mode').value;
             if (mode === 'replace' && !confirm('Replace ALL existing relations with this file? Export a backup first.')) return;
             const count = await api.importRelations(text, { mode });
             resultEl.textContent = `Imported ${count} relations. Reloading…`;
             // re-mark words
-            const strongIds = Array.from(document.querySelectorAll('.word-box[data-strong]')).map(el => el.dataset.strong).filter(Boolean);
+            const strongIds = Array.from(root.querySelectorAll('.word-box[data-strong]')).map(el => el.dataset.strong).filter(Boolean);
             await markWordsWithRelations([...new Set(strongIds)]);
         } catch (err) {
             resultEl.textContent = 'Import failed: ' + String(err);
@@ -747,12 +757,12 @@ async function initFromHash() {
 window.addEventListener('error', (ev) => {
     console.error('Unhandled error', ev.error || ev.message, ev);
     if (resultEl) resultEl.textContent = 'Runtime error: ' + String(ev.error || ev.message);
-});
+}, {signal:lifecycle.signal});
 window.addEventListener('unhandledrejection', (ev) => {
     console.error('Unhandled rejection', ev.reason);
     if (resultEl) resultEl.textContent = 'Unhandled promise rejection: ' + String(ev.reason);
-});
+}, {signal:lifecycle.signal});
 
 export default {};
 
-document.getElementById('write-token')?.addEventListener('input', e => api.setWriteToken(e.target.value));
+root.getElementById('write-token')?.addEventListener('input', e => api.setWriteToken(e.target.value));
