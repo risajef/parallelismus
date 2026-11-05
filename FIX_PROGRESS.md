@@ -12,7 +12,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 4 Complete word usages | Complete | Sharded reverse index; cold detail and cache regression tests. |
 | 5 Relation validation and durable writes | Complete | Validated API command and browser boundary, FK enforcement, duplicate and transaction-abort tests. |
 | 6 Transactional corpus import | Complete | One book transaction, idempotent upserts; interruption rollback and retry regression. |
-| 7 Current and repeatable seed | Pending | |
+| 7 Current and repeatable seed | Complete | Current importer and Strong keys; repeatable seed regression; setup instructions corrected. |
 | 8 Stable corpus references and backups | Pending | |
 | 9 Source navigation | Pending | |
 | 10 Embedded links | Pending | |

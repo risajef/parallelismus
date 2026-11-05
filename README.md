@@ -12,4 +12,6 @@ python3 -m backend.seed  # creates database and seeds sample data
 uvicorn backend.main:app --reload
 ```
 
-Open `frontend/index.html` in a browser or serve it with a static server. The frontend will talk to `http://localhost:8000`.
+Open `http://localhost:8000/` for the backend UI. To load the complete corpus instead of the sample, run `python3 -m backend.import_strong` from this directory. Both import and seed can be rerun safely.
+
+For the independent browser-only version, run `npm ci`, `npm run build`, then `npm run serve`. Open the printed HTTP URL; opening HTML via `file://` is not supported.

@@ -67,6 +67,7 @@ def import_book(file, db_engine=engine):
                 if not isinstance(original, str) or not isinstance(translation, str):
                     raise ValueError('Token text must be a string')
                 merge_word(session, words, strong, original, translation)
+                session.flush()  # persist new words before association foreign keys
                 if strong not in links:
                     link = VerseWord(verse_id=verse.id, word_id=strong, original=original, translation=translation)
                     session.add(link); links[strong] = link
