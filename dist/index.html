@@ -98,7 +98,9 @@
                 <div id="members-list" class="members-list"></div>
                 <div class="member-add-row">
                   <input id="member-input" placeholder="strong id" />
-                  <button id="add-member" type="button" title="Add member">+</button>
+                  <button id="add-member" type="button" title="Add member">
+                    +
+                  </button>
                 </div>
                 <input id="compose-target" placeholder="set / target strong" />
               </div>
@@ -125,6 +127,7 @@
               <button id="exportRelations" title="Download relations as JSON">
                 ⬇ Export Relations
               </button>
+              <label>Import mode <select id="import-mode"><option value="merge">Merge with existing</option><option value="replace">Replace all existing</option></select></label>
               <button
                 id="importRelations"
                 title="Load relations from a JSON file"

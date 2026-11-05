@@ -4,12 +4,14 @@
   "private": true,
   "devDependencies": {
     "esbuild": "^0.28.1",
+    "fake-indexeddb": "^6.2.7",
     "sass": "^1.73.1"
   },
   "scripts": {
     "build:css": "sass frontend/styles.scss frontend/styles.css --no-source-map --style=expanded",
     "watch:css": "sass --watch frontend/styles.scss:frontend/styles.css --style=expanded",
     "build": "node build.js",
-    "serve": "npx serve dist -l 3000"
+    "serve": "npx serve dist -l 3000",
+    "test": "node --test tests/*.test.mjs"
   }
 }

@@ -368,21 +368,37 @@ export async function exportRelations() {
     return JSON.stringify(all, null, 2);
 }
 
-export async function importRelations(jsonString) {
+export async function importRelations(jsonString, { mode = 'merge' } = {}) {
     const records = JSON.parse(jsonString);
     if (!Array.isArray(records)) throw new Error('Expected an array of relation objects');
-    await new Promise((resolve, reject) => {
-        const tx = _db.transaction('relations', 'readwrite');
-        tx.objectStore('relations').clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+    if (!['merge', 'replace'].includes(mode)) throw new Error('Unknown import mode');
+    const ids = new Set();
+    const validated = records.map((rec) => {
+        if (!rec || typeof rec !== 'object' || Array.isArray(rec)) throw new Error('Invalid relation object');
+        if (!_wordsMap[rec.source_id] || !_wordsMap[rec.target_id]) throw new Error('Unknown relation endpoint');
+        if (!RELATION_TYPES.includes(rec.relation_type)) throw new Error('Unknown relation type');
+        if (rec.source_verse_id != null && !_verseToChapter[rec.source_verse_id]) throw new Error('Unknown evidence verse');
+        if (rec.notes != null && typeof rec.notes !== 'string') throw new Error('Invalid notes');
+        if (rec.id != null && (!Number.isSafeInteger(rec.id) || rec.id < 1 || ids.has(rec.id))) throw new Error('Invalid or duplicate relation ID');
+        ids.add(rec.id);
+        const record = { source_id: rec.source_id, target_id: rec.target_id, relation_type: rec.relation_type,
+            source_verse_id: rec.source_verse_id ?? null, notes: rec.notes ?? null };
+        if (mode === 'replace' && rec.id != null) record.id = rec.id;
+        return record;
     });
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
-        const store = tx.objectStore('relations');
-        for (const rec of records) store.put(rec);
-        tx.oncomplete = () => resolve(records.length);
-        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve(validated.length);
+        tx.onabort = () => reject(tx.error || new Error('Import aborted; existing relations preserved'));
+        tx.onerror = () => {}; // abort is the final transaction outcome
+        try {
+            const store = tx.objectStore('relations');
+            if (mode === 'replace') store.clear();
+            for (const rec of validated) store.add(rec);
+        } catch (err) {
+            tx.abort();
+            reject(err);
+        }
     });
 }
 

@@ -679,7 +679,9 @@ document.getElementById('importRelations').addEventListener('click', () => {
         if (!file) return;
         try {
             const text = await file.text();
-            const count = await api.importRelations(text);
+            const mode = document.getElementById('import-mode').value;
+            if (mode === 'replace' && !confirm('Replace ALL existing relations with this file? Export a backup first.')) return;
+            const count = await api.importRelations(text, { mode });
             resultEl.textContent = `Imported ${count} relations. Reloading…`;
             // re-mark words
             const strongIds = Array.from(document.querySelectorAll('.word-box[data-strong]')).map(el => el.dataset.strong).filter(Boolean);
