@@ -371,7 +371,7 @@ async function loadWords(verseId) {
     wordsEl.innerHTML = '';
     words.forEach(w => {
         const li = document.createElement('li');
-        li.appendChild(buildWordBox(w));
+        li.appendChild(buildWordBox(w, verseId));
         wordsEl.appendChild(li);
     });
     try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { }
