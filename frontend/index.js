@@ -799,3 +799,5 @@ async function initFromPath() {
 initFromPath();
 
 export default {};
+
+document.getElementById('write-token').addEventListener('input', e => api.setWriteToken(e.target.value));

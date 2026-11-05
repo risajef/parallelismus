@@ -1,3 +1,8 @@
+export function setWriteToken(token) { sessionStorage.setItem('parallelismus-write-token', token); }
+function writeHeaders() {
+    const token = sessionStorage.getItem('parallelismus-write-token') || '';
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
 // Compiled JS from app.ts (minimal, ES6)
 // Detect API base robustly: if running on localhost/127.0.0.1 or served by the same origin,
 // prefer the page origin. Otherwise default to empty which uses relative paths.
@@ -44,7 +49,7 @@ export async function fetchWords(verseId) {
 export async function addRelation(payload) {
     const res = await fetch(`${apiBase}/relations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: writeHeaders(),
         body: JSON.stringify(payload),
     });
     return res.json();
@@ -121,6 +126,7 @@ export async function fetchWordDetail(strong) {
 export async function deleteRelation(relationId) {
     const res = await fetch(`${apiBase}/relations/${relationId}`, {
         method: 'DELETE',
+        headers: writeHeaders(),
     });
     if (!res.ok) throw new Error('Failed to delete relation');
     return res.json();

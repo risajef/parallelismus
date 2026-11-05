@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 import logging
+import os
+import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -81,20 +83,28 @@ def root() -> FileResponse:
     return FileResponse("frontend/index.html")
 
 
-# allow CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8001",
-        "http://127.0.0.1:8001",
-        "*",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Writes are disabled until an operator configures a token. CORS is not authorization.
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
+    'PARALLELISMUS_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000'
+).split(',') if origin.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False, allow_methods=['GET', 'POST', 'DELETE'],
+    allow_headers=['Authorization', 'Content-Type'])
+
+
+@app.middleware('http')
+async def protect_writes(request: Request, call_next):
+    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        token = os.getenv('PARALLELISMUS_WRITE_TOKEN', '')
+        if not token:
+            return JSONResponse(status_code=503, content={'detail': 'Backend is read-only; configure PARALLELISMUS_WRITE_TOKEN to enable writes'})
+        origin = request.headers.get('origin')
+        if origin and origin not in ALLOWED_ORIGINS:
+            return JSONResponse(status_code=403, content={'detail': 'Origin not allowed'})
+        expected = 'Bearer ' + token
+        if not secrets.compare_digest(request.headers.get('authorization', ''), expected):
+            return JSONResponse(status_code=401, content={'detail': 'A valid write token is required'}, headers={'WWW-Authenticate':'Bearer'})
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -405,17 +415,6 @@ def book_chapter_page(book_id: int, chapter_id: int):
 def book_chapter_verse_page(book_id: int, chapter_id: int, verse_id: int):
     """Serve the SPA for direct navigation to a verse."""
     return FileResponse("frontend/index.html")
-
-
-@app.get("/debug/headers")
-def debug_headers(request: Request):
-    """Return the received request headers and client host for debugging proxies/service-workers."""
-    try:
-        client = request.client.host if request.client else "unknown"
-    except Exception:
-        client = "unknown"
-    headers = {k: v for k, v in request.headers.items()}
-    return JSONResponse(content={"client": client, "headers": headers})
 
 
 @app.get("/chapter/{chapter_id}", response_model=Chapter)
