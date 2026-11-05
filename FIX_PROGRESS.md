@@ -23,10 +23,12 @@ Each completed entry is committed separately. The commit containing an entry is 
 | HTTP errors and initialization recovery | Complete | Checked JSON HTTP adapter, retryable initialization, blocked-upgrade/version-change handling; error and retry regressions. |
 | Embedded DOM and style isolation | Complete | Root-scoped CSS, IDs, selection and keyboard handlers; disposable global listeners; no parent loader changes. |
 | Safe HTML rendering | Complete | Variant text rendered with DOM text nodes; error text safe; adjacent-character escaping regression. |
-| Isolated tests, graph export, CI | Complete | Safe diagnostic import, multigraph export, subrepo CI, 15 JavaScript and 9 Python tests plus standalone/embedded/backend browser smoke checks. |
+| Isolated tests, graph export, CI | Complete | Safe diagnostic import, multigraph export, subrepo CI, 17 JavaScript and 11 Python tests plus standalone/embedded/backend browser smoke checks. |
 
 Browser follow-up: single-verse rendering now retains evidence identity as well as whole-chapter rendering. The browser smoke suite caught the missing argument during source navigation.
 
 Legacy SQLite follow-up: seed and importer apply additive schema upgrades themselves. Reimport rebuilds token associations transactionally so legacy rows with no positions cannot leave duplicate occurrences. Regression covers upgrading and rerunning without first starting the server.
 
 Composition follow-up: distinct member sets may share members at the same evidence verse. Uniqueness includes assertion identity; upgrading the earlier SQLite constraint preserves rows and enables overlapping assertions. Tests ensure deleting one group leaves the other intact.
+
+Backup follow-up: importing the same backup in merge mode is idempotent. Duplicate assertions in a replacement fail atomically, and an actual legacy IndexedDB-record migration is covered by regression.

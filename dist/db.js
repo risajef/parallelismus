@@ -79,7 +79,6 @@ function openRelationsDB() {
 function resolveReference(record) {
     const key = record.source_verse_key ?? _legacyVerseKeys[record.source_verse_id];
     if (key == null) {
-        if (_corpus.id === 'test-corpus') return record;
         throw new Error('Unknown legacy evidence verse; restore a compatible backup');
     }
     const verse = _verses.find(v => v.key === key);
@@ -110,7 +109,8 @@ export async function initDB(onProgress) {
         if (!resp.ok) throw new Error(`Failed to fetch ${INDEX_URL}: ${resp.status}`);
         const data = await resp.json();
 
-        _corpus = data.corpus || {id:'test-corpus',revision:'test'};
+        if (data.corpus?.id !== 'strong-bible-v1') throw new Error('Incompatible corpus index; rebuild application data');
+        _corpus = data.corpus;
         _legacyVerseKeys = data.legacyVerseKeys || {};
         _books = data.books;
         _chapters = data.chapters;
@@ -440,17 +440,27 @@ export async function importRelations(jsonString, { mode = 'merge' } = {}) {
     });
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
-        tx.oncomplete = () => resolve(validated.length);
+        let count = 0;
+        tx.oncomplete = () => resolve(count);
         tx.onabort = () => reject(tx.error || new Error('Import aborted; existing relations preserved'));
-        tx.onerror = () => {}; // abort is the final transaction outcome
-        try {
-            const store = tx.objectStore('relations');
-            if (mode === 'replace') store.clear();
-            for (const rec of validated) store.add(rec);
-        } catch (err) {
-            tx.abort();
-            reject(err);
-        }
+        tx.onerror = () => {};
+        const store = tx.objectStore('relations');
+        store.getAll().onsuccess = event => {
+            try {
+                const existing = new Set(mode === 'merge' ? event.target.result.map(relationKey) : []);
+                const seen = new Set();
+                for (const record of validated) {
+                    const key = relationKey(record);
+                    if (seen.has(key)) throw new Error('Duplicate assertion in backup');
+                    seen.add(key);
+                }
+                if (mode === 'replace') store.clear();
+                for (const record of validated) {
+                    if (existing.has(relationKey(record))) continue;
+                    store.add(record);count++;
+                }
+            } catch (err) { tx.abort();reject(err); }
+        };
     });
 }
 

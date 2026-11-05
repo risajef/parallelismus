@@ -9,7 +9,7 @@ test('invalid replacement and failed writes preserve annotations', async()=>{
     const add=IDBObjectStore.prototype.add;
     let calls=0;
     IDBObjectStore.prototype.add=function(...args){if(++calls===2) throw new Error('quota'); return add.apply(this,args)};
-    try { await assert.rejects(api.importRelations(JSON.stringify([relation,relation]),{mode:'replace'}),/quota/); }
+    try { await assert.rejects(api.importRelations(JSON.stringify([relation,{...relation,target_id:'c'}]),{mode:'replace'}),/quota/); }
     finally {IDBObjectStore.prototype.add=add;}
     assert.equal(JSON.parse(await api.exportRelations()).relations.length,1);
 });
@@ -19,4 +19,13 @@ test('merge is default and empty replacement is explicit',async()=>{
     assert.equal(JSON.parse(await api.exportRelations()).relations.length,2);
     await api.importRelations('[]',{mode:'replace'});
     assert.deepEqual(JSON.parse(await api.exportRelations()).relations,[]);
+});
+
+test('merging the same backup is idempotent and duplicate replacements preserve old data',async()=>{
+    const api=await freshDB();await api.addRelation(relation);
+    const backup=await api.exportRelations();
+    assert.equal(await api.importRelations(backup),0);
+    assert.equal(await api.importRelations(backup),0);
+    await assert.rejects(api.importRelations(JSON.stringify([relation,relation]),{mode:'replace'}),/Duplicate assertion/);
+    assert.equal(JSON.parse(await api.exportRelations()).relations.length,1);
 });

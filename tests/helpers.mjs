@@ -1,7 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { pathToFileURL } from 'node:url';
-export const corpus = { books: [{id:1,name:'Sample'}], chapters:[{id:1,book_id:1,number:1}],
-    verses:[{id:1,chapter_id:1,number:1},{id:2,chapter_id:1,number:2}],
+export const corpus = { corpus:{id:'strong-bible-v1',revision:'fixture'},legacyVerseKeys:{1:'01001001',2:'01001002'}, books: [{id:1,name:'Sample'}], chapters:[{id:1,book_id:1,number:1}],
+    verses:[{id:1,key:'01001001',chapter_id:1,number:1},{id:2,key:'01001002',chapter_id:1,number:2}],
     words:['a','b','c'].map(strong=>({strong,original:[strong],translation:[strong]})) };
 export const relation = {source_id:'a',target_id:'b',relation_type:'similar',source_verse_id:1};
 export async function freshDB(fetcher) {
