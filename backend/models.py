@@ -19,11 +19,12 @@ class VerseWord(SQLModel, table=True):
 
 class Book(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(index=True, unique=True)
     chapters: list["Chapter"] = Relationship(back_populates="book")
 
 
 class Chapter(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint('book_id', 'number'),)
     id: Optional[int] = Field(default=None, primary_key=True)
     book_id: int = Field(foreign_key="book.id")
     number: int
@@ -32,6 +33,7 @@ class Chapter(SQLModel, table=True):
 
 
 class Verse(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint('chapter_id', 'number'),)
     id: Optional[int] = Field(default=None, primary_key=True)
     chapter_id: int = Field(foreign_key="chapter.id")
     number: int
