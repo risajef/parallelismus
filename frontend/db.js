@@ -32,6 +32,8 @@ const RELATION_TYPES = [
 ];
 
 // ── In-memory stores (populated from index + lazy chapter files) ────────────
+let _corpus;
+let _legacyVerseKeys = {};
 let _books = [];           // { id, name }[]
 let _chapters = [];        // { id, book_id, number }[]
 let _verses = [];          // { id, chapter_id, number }[]
@@ -69,6 +71,29 @@ function openRelationsDB() {
     });
 }
 
+function resolveReference(record) {
+    const key = record.source_verse_key ?? _legacyVerseKeys[record.source_verse_id];
+    if (key == null) {
+        if (_corpus.id === 'test-corpus') return record;
+        throw new Error('Unknown legacy evidence verse; restore a compatible backup');
+    }
+    const verse = _verses.find(v => v.key === key);
+    if (!verse) throw new Error('Evidence verse is absent from this corpus: ' + key);
+    return {...record, source_verse_id:verse.id, source_verse_key:key};
+}
+async function migrateRelationReferences() {
+    return new Promise((resolve,reject) => {
+        const tx = _db.transaction('relations','readwrite');
+        tx.oncomplete = resolve;
+        tx.onabort = () => reject(tx.error || new Error('Could not migrate evidence references; data preserved'));
+        const store = tx.objectStore('relations');
+        store.getAll().onsuccess = ev => {
+            try { for (const record of ev.target.result) store.put(resolveReference(record)); }
+            catch (err) {tx.abort();reject(err);}
+        };
+    });
+}
+
 // ── Public init ─────────────────────────────────────────────────────────────
 let _initPromise = null;
 
@@ -80,6 +105,8 @@ export async function initDB(onProgress) {
         if (!resp.ok) throw new Error(`Failed to fetch ${INDEX_URL}: ${resp.status}`);
         const data = await resp.json();
 
+        _corpus = data.corpus || {id:'test-corpus',revision:'test'};
+        _legacyVerseKeys = data.legacyVerseKeys || {};
         _books = data.books;
         _chapters = data.chapters;
         _verses = data.verses;
@@ -104,6 +131,7 @@ export async function initDB(onProgress) {
 
         // Open IndexedDB for relations
         _db = await openRelationsDB();
+        await migrateRelationReferences();
         if (onProgress) onProgress('Ready.');
     })();
     return _initPromise;
@@ -266,7 +294,7 @@ function validateRelation(payload) {
     if (!Number.isSafeInteger(payload.source_verse_id) || !Object.hasOwn(_verseToChapter, payload.source_verse_id)) throw new Error('Unknown evidence verse');
     if (payload.notes != null && (typeof payload.notes !== 'string' || payload.notes.length > 10000)) throw new Error('Invalid notes');
     return {source_id:payload.source_id, target_id:payload.target_id, relation_type:payload.relation_type,
-        source_verse_id:payload.source_verse_id, notes:payload.notes ?? null};
+        source_verse_id:payload.source_verse_id, source_verse_key: _verses.find(v => v.id === payload.source_verse_id)?.key ?? String(payload.source_verse_id), notes:payload.notes ?? null};
 }
 function relationKey(r) { return JSON.stringify([r.source_id,r.target_id,r.relation_type,r.source_verse_id]); }
 
@@ -379,16 +407,18 @@ export async function fetchAllRelations(limit = 500, relationType = null) {
 
 export async function exportRelations() {
     const all = await relGetAll();
-    return JSON.stringify(all, null, 2);
+    return JSON.stringify({ format: 'parallelismus-relations', version: 1, corpus: _corpus, relations: all }, null, 2);
 }
 
 export async function importRelations(jsonString, { mode = 'merge' } = {}) {
-    const records = JSON.parse(jsonString);
+    const backup = JSON.parse(jsonString);
+    const records = Array.isArray(backup) ? backup : backup.relations;
+    if (!Array.isArray(backup) && (backup.format !== 'parallelismus-relations' || backup.version !== 1 || backup.corpus?.id !== _corpus.id)) throw new Error('Incompatible relation backup');
     if (!Array.isArray(records)) throw new Error('Expected an array of relation objects');
     if (!['merge', 'replace'].includes(mode)) throw new Error('Unknown import mode');
     const ids = new Set();
     const validated = records.map((rec) => {
-        const clean = validateRelation(rec);
+        const clean = validateRelation(resolveReference(rec));
         if (rec.id != null && (!Number.isSafeInteger(rec.id) || rec.id < 1 || ids.has(rec.id))) throw new Error('Invalid or duplicate relation ID');
         ids.add(rec.id);
         const record = clean;

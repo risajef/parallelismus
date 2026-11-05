@@ -11,6 +11,7 @@
  */
 
 const fs = require('fs');
+const { createHash } = require('crypto');
 const path = require('path');
 const { execSync } = require('child_process');
 const esbuild = require('esbuild');
@@ -73,12 +74,12 @@ function preprocessBible() {
             chapterId++;
             chapters.push({ id: chapterId, book_id: bookId, number: chNum });
 
-            const chVerses = byChapter[chNum];
+            const chVerses = byChapter[chNum].sort((a,b) => a.id.localeCompare(b.id));
             const chapterData = { verses: [] };
 
             for (let vi = 0; vi < chVerses.length; vi++) {
                 verseId++;
-                verses.push({ id: verseId, chapter_id: chapterId, number: vi + 1 });
+                verses.push({ id: verseId, chapter_id: chapterId, number: Number(chVerses[vi].id.slice(5)), key: chVerses[vi].id });
 
                 const verseData = { id: verseId, number: vi + 1, words: [] };
                 const rawWords = chVerses[vi].verse;
@@ -136,7 +137,9 @@ function preprocessBible() {
     for (const [shard, usages] of Object.entries(usagesMap)) {
         fs.writeFileSync(path.join(usageDir, encodeURIComponent(shard) + '.json'), JSON.stringify(usages));
     }
-    const index = { books, chapters, verses, words };
+    const corpus = { id: 'strong-bible-v1', revision: createHash('sha256').update(JSON.stringify(verses.map(v => v.key))).digest('hex') };
+    const legacyVerseKeys = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/legacy-verse-keys.json')));
+    const index = { corpus, legacyVerseKeys, books, chapters, verses, words };
     const indexPath = path.join(DATA_DIR, 'bible-index.json');
     fs.writeFileSync(indexPath, JSON.stringify(index));
     console.log(`  → ${indexPath} (${(fs.statSync(indexPath).size / 1024).toFixed(0)} KB)`);

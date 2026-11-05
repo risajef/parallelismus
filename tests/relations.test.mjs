@@ -9,11 +9,11 @@ test('storage validates references and rejects duplicates atomically',async()=>{
     await assert.rejects(api.addRelation({...relation,relation_type:'invented'}));
     await api.addRelation(relation);
     await assert.rejects(api.addRelations([{...relation,target_id:'c'},relation]),/already exists/);
-    assert.equal(JSON.parse(await api.exportRelations()).length,1);
+    assert.equal(JSON.parse(await api.exportRelations()).relations.length,1);
 });
 test('a successful request followed by transaction abort does not report success',async()=>{
     const api=await freshDB();const add=IDBObjectStore.prototype.add;
     IDBObjectStore.prototype.add=function(...args){const req=add.apply(this,args);req.addEventListener('success',()=>this.transaction.abort());return req;};
     try {await assert.rejects(api.addRelation(relation),/abort/i);} finally {IDBObjectStore.prototype.add=add;}
-    assert.equal(JSON.parse(await api.exportRelations()).length,0);
+    assert.equal(JSON.parse(await api.exportRelations()).relations.length,0);
 });
