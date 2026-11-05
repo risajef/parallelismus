@@ -164,3 +164,14 @@ export async function fetchAllRelations(limit = 500, relationType = null) {
     if (!response.ok) throw new Error('Failed to fetch relations');
     return response.json();
 }
+
+export async function addComposition(members, target, evidence) {
+    const response = await fetch(`${apiBase}/compositions`, {method:'POST',headers:writeHeaders(),body:JSON.stringify({members,target_id:target,source_verse_id:evidence})});
+    if (!response.ok) throw new Error('Composition write failed: ' + response.status);
+    return response.json();
+}
+export async function deleteComposition(id) {
+    const response = await fetch(`${apiBase}/compositions/${encodeURIComponent(id)}`, {method:'DELETE',headers:writeHeaders()});
+    if (!response.ok) throw new Error('Composition deletion failed: ' + response.status);
+    return response.json();
+}

@@ -16,6 +16,11 @@ if DATABASE_URL.startswith('sqlite:'):
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    if DATABASE_URL.startswith('sqlite:'):
+        with engine.begin() as connection:
+            columns = {row[1] for row in connection.exec_driver_sql('PRAGMA table_info(relation)')}
+            if 'composition_id' not in columns:
+                connection.exec_driver_sql('ALTER TABLE relation ADD COLUMN composition_id VARCHAR')
 
 
 def get_session() -> Generator[Session, None, None]:

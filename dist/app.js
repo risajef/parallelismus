@@ -16,6 +16,8 @@ export {
     fetchWordDetail,
     fetchStrongSearch,
     addRelation,
+    addComposition,
+    deleteComposition,
     addRelations,
     deleteRelation,
     fetchRelations,
@@ -28,3 +30,5 @@ export {
     importRelations,
     transliterate,
 } from './db.js';
+
+export function setWriteToken() {}

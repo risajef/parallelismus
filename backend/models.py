@@ -70,6 +70,7 @@ class Relation(SQLModel, table=True):
     relation_type: str
     source_verse_id: Optional[int] = Field(default=None, foreign_key="verse.id")
     notes: Optional[str] = None
+    composition_id: Optional[str] = Field(default=None, index=True)
     source_word: Optional["Word"] = Relationship(
         back_populates="relations_from",
         sa_relationship_kwargs={"primaryjoin": "Relation.source_id==Word.strong"},

@@ -35,6 +35,7 @@ class WordInVerse(BaseModel):
 
 
 class RelationGroup(BaseModel):
+    composition_id: str | None = None
     source_id: str
     target_id: str
     relation_type: str
@@ -476,16 +477,17 @@ def get_grouped_relations(word_id: str):
         ).all()
         groups: dict[tuple[str, str, str], set[int]] = {}
         for r in rows:
-            key = (r.source_id, r.target_id, r.relation_type)
+            key = (r.source_id, r.target_id, r.relation_type, r.composition_id)
             groups.setdefault(key, set())
             if r.source_verse_id is not None:
                 groups[key].add(r.source_verse_id)
 
         result: list[RelationGroup] = []
-        for (s, t, typ), verses in groups.items():
+        for (s, t, typ, composition_id), verses in groups.items():
             result.append(
                 RelationGroup(
                     source_id=s,
+                    composition_id=composition_id,
                     target_id=t,
                     relation_type=typ,
                     source_verse_ids=sorted(list(verses)),
@@ -526,6 +528,44 @@ def add_relation(relation: RelationCreate):
         return saved
 
 
+class CompositionCreate(BaseModel):
+    members: list[str] = InputField(min_items=1, max_items=1000)
+    target_id: str
+    source_verse_id: int = InputField(gt=0)
+
+
+@app.post('/compositions', response_model=List[Relation])
+def add_composition(command: CompositionCreate):
+    from uuid import uuid4
+    from sqlmodel import Session
+    group = str(uuid4())
+    if len(set(command.members)) != len(command.members):
+        raise HTTPException(422, 'Duplicate members')
+    with Session(engine) as session, session.begin():
+        if not session.get(Verse, command.source_verse_id):
+            raise HTTPException(422, 'Unknown evidence verse')
+        if any(not session.get(Word, s) for s in [command.target_id, *command.members]):
+            raise HTTPException(422, 'Unknown relation endpoint')
+        existing = session.exec(select(Relation).where(Relation.target_id == command.target_id,
+            Relation.relation_type == 'composes', Relation.source_verse_id == command.source_verse_id)).all()
+        if any(r.source_id in command.members for r in existing):
+            raise HTTPException(409, 'Composition member already exists at this evidence verse')
+        rows = [Relation(source_id=s, target_id=command.target_id, relation_type='composes',
+            source_verse_id=command.source_verse_id, composition_id=group) for s in command.members]
+        session.add_all(rows);session.flush()
+        return [row.dict() for row in rows]
+
+
+@app.delete('/compositions/{composition_id}')
+def delete_composition(composition_id: str):
+    from sqlmodel import Session
+    with Session(engine) as session, session.begin():
+        rows = session.exec(select(Relation).where(Relation.composition_id == composition_id)).all()
+        if not rows: raise HTTPException(404, 'Composition not found')
+        for row in rows: session.delete(row)
+    return {'deleted': len(rows)}
+
+
 @app.delete("/relations/{relation_id}", response_model=Relation)
 def delete_relation(relation_id: int):
     """Delete a relation by id and return the deleted relation."""
@@ -537,6 +577,8 @@ def delete_relation(relation_id: int):
             raise HTTPException(status_code=404, detail="Relation not found")
         # store a copy to return after deletion
         out = Relation.from_orm(rel)
+        if rel.composition_id:
+            raise HTTPException(409, 'Delete the complete composition instead')
         session.delete(rel)
         session.commit()
         return out

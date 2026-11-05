@@ -294,8 +294,9 @@ function validateRelation(payload) {
     if (!RELATION_TYPES.includes(payload.relation_type)) throw new Error('Unknown relation type');
     if (!Number.isSafeInteger(payload.source_verse_id) || !Object.hasOwn(_verseToChapter, payload.source_verse_id)) throw new Error('Unknown evidence verse');
     if (payload.notes != null && (typeof payload.notes !== 'string' || payload.notes.length > 10000)) throw new Error('Invalid notes');
+    if (payload.composition_id != null && (typeof payload.composition_id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(payload.composition_id))) throw new Error('Invalid composition ID');
     return {source_id:payload.source_id, target_id:payload.target_id, relation_type:payload.relation_type,
-        source_verse_id:payload.source_verse_id, source_verse_key: _verses.find(v => v.id === payload.source_verse_id)?.key ?? String(payload.source_verse_id), notes:payload.notes ?? null};
+        source_verse_id:payload.source_verse_id, source_verse_key: _verses.find(v => v.id === payload.source_verse_id)?.key ?? String(payload.source_verse_id), notes:payload.notes ?? null, composition_id: payload.composition_id ?? null};
 }
 function relationKey(r) { return JSON.stringify([r.source_id,r.target_id,r.relation_type,r.source_verse_id]); }
 
@@ -321,6 +322,19 @@ export async function addRelations(payloads) {
 }
 export async function addRelation(payload) { return (await addRelations([payload]))[0]; }
 
+export async function addComposition(members, target, evidence) {
+    const composition_id = crypto.randomUUID();
+    return addRelations(members.map(source_id => ({source_id,target_id:target,relation_type:'composes',source_verse_id:evidence,composition_id})));
+}
+export async function deleteComposition(id) {
+    return new Promise((resolve,reject) => {
+        const tx = _db.transaction('relations','readwrite');
+        tx.oncomplete = resolve;tx.onabort = () => reject(tx.error || new Error('Composition deletion aborted'));
+        const store = tx.objectStore('relations');
+        store.getAll().onsuccess = ev => {for (const row of ev.target.result) if (row.composition_id === id) store.delete(row.id);};
+    });
+}
+
 export async function deleteRelation(relationId) {
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
@@ -330,7 +344,7 @@ export async function deleteRelation(relationId) {
         const store = tx.objectStore('relations');
         store.get(Number(relationId)).onsuccess = ev => {
             record = ev.target.result;
-            if (!record) { tx.abort(); return; }
+            if (!record || record.composition_id) { tx.abort(); return; }
             store.delete(Number(relationId));
         };
     });
@@ -345,8 +359,8 @@ export async function fetchGroupedRelations(strong) {
     const rels = await fetchRelations(strong);
     const groups = {};
     for (const r of rels) {
-        const key = `${r.source_id}|${r.target_id}|${r.relation_type}`;
-        if (!groups[key]) groups[key] = { source_id: r.source_id, target_id: r.target_id, relation_type: r.relation_type, source_verse_ids: new Set() };
+        const key = `${r.source_id}|${r.target_id}|${r.relation_type}|${r.composition_id || ""}`;
+        if (!groups[key]) groups[key] = { source_id: r.source_id, target_id: r.target_id, relation_type: r.relation_type, composition_id: r.composition_id, source_verse_ids: new Set() };
         if (r.source_verse_id != null) groups[key].source_verse_ids.add(r.source_verse_id);
     }
     return Object.values(groups).map(g => ({

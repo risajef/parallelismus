@@ -17,7 +17,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 9 Source navigation | Complete | Await requested verse rendering and synchronize book/chapter/route; timer removed. Browser regression included in final smoke suite. |
 | 10 Embedded links | Complete | Shared base-aware page URL builder for dynamic links and keyboard opening; embedded URL regression. |
 | Shared UI and adapter contracts | Complete | Shared page controllers and transliteration; stale TypeScript removed; adapter contract regression. |
-| Atomic composition identity | Pending | |
+| Atomic composition identity | Complete | Group IDs, transactional creation/deletion in both adapters; rollback and whole-group deletion tests. |
 | Repeated token preservation | Pending | |
 | Lazy loading and relation queries | Pending | |
 | HTTP errors and initialization recovery | Pending | |

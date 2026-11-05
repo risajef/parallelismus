@@ -505,10 +505,11 @@ document.getElementById('showRelations').addEventListener('click', async () => {
         removeBtn.addEventListener('click', async () => {
             if (!confirm('Remove this relation group? This will delete matching relations individually.')) return;
             try {
-                const full = await api.fetchRelations(g.source_id);
-                const toDelete = full.filter(r => r.source_id === g.source_id && r.target_id === g.target_id && r.relation_type === g.relation_type);
-                for (const r of toDelete) {
-                    await api.deleteRelation(r.id);
+                if (g.composition_id) {
+                    await api.deleteComposition(g.composition_id);
+                } else {
+                    const full = await api.fetchRelations(g.source_id);
+                    for (const r of full.filter(r => !r.composition_id && r.source_id === g.source_id && r.target_id === g.target_id && r.relation_type === g.relation_type)) await api.deleteRelation(r.id);
                 }
                 document.getElementById('showRelations').click();
             } catch (err) {
@@ -627,11 +628,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
         if (!target) { resultEl.textContent = 'Please enter the set / target strong ID'; return; }
 
         try {
-            for (const member of members) {
-                const payload = { source_id: member, target_id: target, relation_type: 'composes' };
-                payload.source_verse_id = evidenceId;
-                await api.addRelation(payload);
-            }
+            await api.addComposition(members, target, evidenceId);
             resultEl.textContent = `Added ${members.length} "composes" relation(s) -> ${target}`;
             clearRelationSelection();
             if (composeTargetEl) composeTargetEl.value = '';
