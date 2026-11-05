@@ -18,7 +18,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 10 Embedded links | Complete | Shared base-aware page URL builder for dynamic links and keyboard opening; embedded URL regression. |
 | Shared UI and adapter contracts | Complete | Shared page controllers and transliteration; stale TypeScript removed; adapter contract regression. |
 | Atomic composition identity | Complete | Group IDs, transactional creation/deletion in both adapters; rollback and whole-group deletion tests. |
-| Repeated token preservation | Pending | |
+| Repeated token preservation | Complete | Preserve each token and position in browser corpus and SQLite; repeated-Strong retry regression. |
 | Lazy loading and relation queries | Pending | |
 | HTTP errors and initialization recovery | Pending | |
 | Embedded DOM and style isolation | Pending | |

@@ -88,7 +88,6 @@ function preprocessBible() {
                     continue;
                 }
 
-                const seenInVerse = new Set();
 
                 for (const w of rawWords) {
                     if (!w || typeof w !== 'object') continue;
@@ -107,10 +106,9 @@ function preprocessBible() {
                     if (translation) wordsMap[strong].translation.add(translation);
 
                     // add word to verse (one per verse+strong)
-                    if (!seenInVerse.has(strong)) {
-                        seenInVerse.add(strong);
+                    {
                         // Compact format: [strong, original, translation]
-                        verseData.words.push([strong, original, translation]);
+                        verseData.words.push([strong, original, translation, verseData.words.length]);
                         const shard = strong.slice(0, 2);
                         if (!usagesMap[shard]) usagesMap[shard] = {};
                         if (!usagesMap[shard][strong]) usagesMap[shard][strong] = [];

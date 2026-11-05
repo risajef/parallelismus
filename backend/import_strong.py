@@ -51,8 +51,8 @@ def import_book(file, db_engine=engine):
             verse = session.exec(select(Verse).where(Verse.chapter_id == chapter.id, Verse.number == verse_no)).one_or_none()
             if verse is None:
                 verse = Verse(chapter_id=chapter.id, number=verse_no); session.add(verse); session.flush()
-            links = {w.word_id:w for w in session.exec(select(VerseWord).where(VerseWord.verse_id == verse.id))}
-            for token in entry.get('verse') or []:
+            links = {w.position:w for w in session.exec(select(VerseWord).where(VerseWord.verse_id == verse.id))}
+            for position, token in enumerate(entry.get('verse') or []):
                 if not isinstance(token, dict):
                     continue
                 strong = token.get('number')
@@ -68,9 +68,11 @@ def import_book(file, db_engine=engine):
                     raise ValueError('Token text must be a string')
                 merge_word(session, words, strong, original, translation)
                 session.flush()  # persist new words before association foreign keys
-                if strong not in links:
-                    link = VerseWord(verse_id=verse.id, word_id=strong, original=original, translation=translation)
-                    session.add(link); links[strong] = link
+                link = links.get(position)
+                if link is None:
+                    link = VerseWord(verse_id=verse.id, word_id=strong, position=position)
+                link.word_id, link.original, link.translation = strong, original, translation
+                session.add(link); links[position] = link
             session.flush()
 
 def import_all(base=BASE, db_engine=engine):

@@ -11,6 +11,7 @@ class VerseWord(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     verse_id: int = Field(foreign_key="verse.id")
+    position: int = Field(default=0)
     word_id: str = Field(foreign_key="word.strong")
     # canonical original and translation for this word in this verse (from the bible JSON)
     original: str = Field(default="")

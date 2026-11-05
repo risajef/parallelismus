@@ -147,7 +147,7 @@ def list_words(verse_id: int, request: Request):
         stmt = (
             _select(Word, VerseWord)
             .join(VerseWord, Word.strong == VerseWord.word_id)
-            .where(VerseWord.verse_id == verse_id)
+            .where(VerseWord.verse_id == verse_id).order_by(VerseWord.position)
         )
         results = session.exec(stmt).all()
         return [
