@@ -1,3 +1,4 @@
+import { strongUrl } from './urls.js';
 import * as api from './app.js';
 
 const qEl = document.getElementById('q');
@@ -39,7 +40,7 @@ async function doSearch() {
             o.innerHTML = `<strong>Originals:</strong> ${Array.isArray(r.original) ? r.original.slice(0, 6).map(x => escapeHtml(x)).join(', ') : ''}`;
             li.appendChild(o);
             const a = document.createElement('a');
-            a.href = 'strong.html#' + encodeURIComponent(r.strong);
+            a.href = strongUrl(r.strong);
             a.textContent = 'Open details';
             a.style.marginTop = '6px';
             a.target = '_blank';

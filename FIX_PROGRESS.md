@@ -15,7 +15,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 7 Current and repeatable seed | Complete | Current importer and Strong keys; repeatable seed regression; setup instructions corrected. |
 | 8 Stable corpus references and backups | Complete | Canonical evidence keys, atomic legacy browser migration, versioned backups and incompatible-corpus regression. |
 | 9 Source navigation | Complete | Await requested verse rendering and synchronize book/chapter/route; timer removed. Browser regression included in final smoke suite. |
-| 10 Embedded links | Pending | |
+| 10 Embedded links | Complete | Shared base-aware page URL builder for dynamic links and keyboard opening; embedded URL regression. |
 | Shared UI and adapter contracts | Pending | |
 | Atomic composition identity | Pending | |
 | Repeated token preservation | Pending | |

@@ -1,3 +1,4 @@
+import { strongUrl } from './urls.js';
 import { evidenceVerse } from './evidence.js';
 // Static frontend – all data from IndexedDB, no backend required.
 import * as api from './app.js';
@@ -310,7 +311,7 @@ function buildWordBox(w, verseId) {
 
     const strongLink = document.createElement('a');
     strongLink.className = 'strong-link';
-    strongLink.href = 'strong.html#' + encodeURIComponent(w.strong);
+    strongLink.href = strongUrl(w.strong);
     strongLink.target = '_blank';
     strongLink.rel = 'noopener noreferrer';
     strongLink.textContent = w.strong || '';
@@ -330,7 +331,7 @@ function buildWordBox(w, verseId) {
     // keyboard
     box.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') {
-            window.open('strong.html#' + encodeURIComponent(w.strong), '_blank');
+            window.open(strongUrl(w.strong), '_blank');
         } else if (ev.key === ' ') {
             ev.preventDefault();
             box.classList.toggle('selected');
