@@ -19,7 +19,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Shared UI and adapter contracts | Complete | Shared page controllers and transliteration; stale TypeScript removed; adapter contract regression. |
 | Atomic composition identity | Complete | Group IDs, transactional creation/deletion in both adapters; rollback and whole-group deletion tests. |
 | Repeated token preservation | Complete | Preserve each token and position in browser corpus and SQLite; repeated-Strong retry regression. |
-| Lazy loading and relation queries | Pending | |
+| Lazy loading and relation queries | Complete | In-flight chapter promises, retries, indexed relation queries and one chapter badge refresh; concurrency/self-edge tests. |
 | HTTP errors and initialization recovery | Pending | |
 | Embedded DOM and style isolation | Pending | |
 | Safe HTML rendering | Pending | |

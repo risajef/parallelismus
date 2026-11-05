@@ -140,12 +140,13 @@ export async function initDB(onProgress) {
 
 // ── Lazy chapter loading ────────────────────────────────────────────────────
 async function ensureChapter(chapterId) {
-    if (_chapterCache[chapterId]) return _chapterCache[chapterId];
-    const resp = await fetch(chapterUrl(chapterId));
-    if (!resp.ok) throw new Error(`Failed to fetch chapter ${chapterId}: ${resp.status}`);
-    const data = await resp.json();
-    _chapterCache[chapterId] = data;
-    return data;
+    if (!_chapterCache[chapterId]) {
+        _chapterCache[chapterId] = fetch(chapterUrl(chapterId)).then(async resp => {
+            if (!resp.ok) throw new Error(`Failed to fetch chapter ${chapterId}: ${resp.status}`);
+            return resp.json();
+        }).catch(err => {delete _chapterCache[chapterId];throw err;});
+    }
+    return _chapterCache[chapterId];
 }
 
 // ── API matching the old interface ──────────────────────────────────────────
@@ -351,8 +352,15 @@ export async function deleteRelation(relationId) {
 }
 
 export async function fetchRelations(strong) {
-    const all = await relGetAll();
-    return all.filter(r => r.source_id === strong || r.target_id === strong);
+    return new Promise((resolve,reject) => {
+        const tx = _db.transaction('relations','readonly');
+        const store = tx.objectStore('relations');
+        let source = [], target = [];
+        tx.onabort = () => reject(tx.error || new Error('Relation query aborted'));
+        tx.oncomplete = () => resolve([...new Map([...source,...target].map(r => [r.id,r])).values()]);
+        store.index('source_id').getAll(strong).onsuccess = ev => {source = ev.target.result;};
+        store.index('target_id').getAll(strong).onsuccess = ev => {target = ev.target.result;};
+    });
 }
 
 export async function fetchGroupedRelations(strong) {
@@ -370,27 +378,12 @@ export async function fetchGroupedRelations(strong) {
 }
 
 export async function fetchRelationsBatch(ids) {
-    if (!Array.isArray(ids) || ids.length === 0) return {};
-    const all = await relGetAll();
-    const out = {};
-    for (const id of ids) out[id] = false;
-    for (const r of all) {
-        if (out.hasOwnProperty(r.source_id)) out[r.source_id] = true;
-        if (out.hasOwnProperty(r.target_id)) out[r.target_id] = true;
-    }
-    return out;
+    const counts = await fetchRelationsCounts(ids);
+    return Object.fromEntries(Object.entries(counts).map(([id,count]) => [id,count > 0]));
 }
-
 export async function fetchRelationsCounts(ids) {
-    if (!Array.isArray(ids) || ids.length === 0) return {};
-    const all = await relGetAll();
-    const out = {};
-    for (const id of ids) out[id] = 0;
-    for (const r of all) {
-        if (out.hasOwnProperty(r.source_id)) out[r.source_id]++;
-        if (out.hasOwnProperty(r.target_id)) out[r.target_id]++;
-    }
-    return out;
+    const entries = await Promise.all([...new Set(ids || [])].map(async id => [id,(await fetchRelations(id)).length]));
+    return Object.fromEntries(entries);
 }
 
 export async function fetchRelationTypes() {

@@ -270,8 +270,9 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
                 ul.appendChild(li);
             });
             vb.wrapper.appendChild(ul);
-            try { await markWordsWithRelations(words.map(x => x.strong).filter(Boolean)); } catch (e) { }
+
         }));
+        await markWordsWithRelations([...new Set(Array.from(wordsEl.querySelectorAll('[data-strong]')).map(el => el.dataset.strong))]);
         return;
     }
     if (currentVerses[0]) await loadWords(currentVerses[0].id);
