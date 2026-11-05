@@ -14,7 +14,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 6 Transactional corpus import | Complete | One book transaction, idempotent upserts; interruption rollback and retry regression. |
 | 7 Current and repeatable seed | Complete | Current importer and Strong keys; repeatable seed regression; setup instructions corrected. |
 | 8 Stable corpus references and backups | Complete | Canonical evidence keys, atomic legacy browser migration, versioned backups and incompatible-corpus regression. |
-| 9 Source navigation | Pending | |
+| 9 Source navigation | Complete | Await requested verse rendering and synchronize book/chapter/route; timer removed. Browser regression included in final smoke suite. |
 | 10 Embedded links | Pending | |
 | Shared UI and adapter contracts | Pending | |
 | Atomic composition identity | Pending | |

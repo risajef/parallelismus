@@ -193,7 +193,7 @@ booksEl.addEventListener('change', async () => {
     if (firstChap) setHash(`/chapter/${firstChap.id}`);
 });
 
-async function loadChapters(bookId) {
+async function loadChapters(bookId, {render = true} = {}) {
     const chapters = await api.fetchChapters(bookId);
     currentChapters = Array.isArray(chapters) ? chapters : [];
     chaptersEl.innerHTML = '';
@@ -202,7 +202,7 @@ async function loadChapters(bookId) {
         opt.value = String(c.number); opt.textContent = c.number;
         chaptersEl.appendChild(opt);
     });
-    if (currentChapters[0]) await loadVerses(currentChapters[0].id);
+    if (render && currentChapters[0]) await loadVerses(currentChapters[0].id);
 }
 
 async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChapter: false }) {
@@ -482,20 +482,16 @@ document.getElementById('showRelations').addEventListener('click', async () => {
                 btn.textContent = `(Source: Link) ${vid}`;
                 btn.style.marginRight = '6px';
                 btn.addEventListener('click', async () => {
-                    const verse = await api.fetchVerse(vid);
-                    if (!verse) return;
-                    const chap = await api.fetchChapter(verse.chapter_id);
-                    if (!chap) return;
-                    await loadChapters(chap.book_id);
-                    setTimeout(async () => {
-                        const chapEntry = currentChapters.find(c => Number(c.id) === Number(chap.id));
-                        if (chapEntry) {
-                            chaptersEl.value = String(chapEntry.number);
-                            await loadVerses(chap.id);
-                            const verseEntry = currentVerses.find(v => Number(v.id) === Number(verse.id));
-                            if (verseEntry) versesEl.value = String(verseEntry.number);
-                        }
-                    }, 150);
+                    try {
+                        const verse = await api.fetchVerse(vid);
+                        if (!verse) throw new Error('Source verse not found');
+                        const chap = await api.fetchChapter(verse.chapter_id);
+                        booksEl.value = String(chap.book_id);
+                        await loadChapters(chap.book_id, {render:false});
+                        chaptersEl.value = String(chap.number);
+                        await loadVerses(chap.id, {selectVerseId:verse.id});
+                        setHash(`/verse/${verse.id}`);
+                    } catch (err) { resultEl.textContent = 'Navigation failed: ' + err.message; }
                 });
                 versesContainer.appendChild(btn);
             });
