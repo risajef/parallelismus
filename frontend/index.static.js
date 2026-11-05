@@ -1,3 +1,4 @@
+import { evidenceVerse } from './evidence.js';
 // Static frontend – all data from IndexedDB, no backend required.
 import * as api from './app.js';
 import { createOption, setOptions, escapeHtml, sampleRandom } from './dom-utils.js';
@@ -263,7 +264,7 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
             ul.className = 'verse-words';
             words.forEach(w => {
                 const li = document.createElement('li');
-                const box = buildWordBox(w);
+                const box = buildWordBox(w, vb.id);
                 li.appendChild(box);
                 ul.appendChild(li);
             });
@@ -275,7 +276,7 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
     if (currentVerses[0]) await loadWords(currentVerses[0].id);
 }
 
-function buildWordBox(w) {
+function buildWordBox(w, verseId) {
     const canonicalOriginal = w.verse_original || '';
     const canonicalTranslation = w.verse_translation || '';
     const box = document.createElement('div');
@@ -285,6 +286,7 @@ function buildWordBox(w) {
     box.setAttribute('draggable', 'true');
     box.setAttribute('aria-label', (canonicalTranslation || canonicalOriginal || w.strong) + ' — strong ' + (w.strong || ''));
     box.dataset.strong = w.strong || '';
+    box.dataset.verseId = String(verseId);
     box.dataset.allOriginals = JSON.stringify(Array.isArray(w.all_originals) ? w.all_originals : []);
     box.dataset.allTranslations = JSON.stringify(Array.isArray(w.all_translations) ? w.all_translations : []);
 
@@ -613,6 +615,13 @@ document.getElementById('addRel').addEventListener('click', async () => {
     if (!type) { resultEl.textContent = 'Please select a relation type'; return; }
     const selectedVerseNumber = Number(versesEl.value || 0);
     const selectedVerse = currentVerses.find(v => Number(v.number) === selectedVerseNumber);
+    let evidenceId;
+    try {
+        evidenceId = evidenceVerse(Array.from(document.querySelectorAll('.word-box.selected')).map(el => el.dataset.verseId), selectedVerse?.id);
+        const evidence = currentVerses.find(v => v.id === evidenceId);
+        if (evidence) versesEl.value = String(evidence.number);
+    } catch (err) { resultEl.textContent = err.message; return; }
+
 
     if (type === 'composes') {
         const members = getComposeMembers();
@@ -623,7 +632,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
         try {
             for (const member of members) {
                 const payload = { source_id: member, target_id: target, relation_type: 'composes' };
-                if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+                payload.source_verse_id = evidenceId;
                 await api.addRelation(payload);
             }
             resultEl.textContent = `Added ${members.length} "composes" relation(s) -> ${target}`;
@@ -642,7 +651,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
     if (!src || !tgt) { resultEl.textContent = 'Please select source and target words'; return; }
 
     const payload = { source_id: src, target_id: tgt, relation_type: type };
-    if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+    payload.source_verse_id = evidenceId;
     try {
         const res = await api.addRelation(payload);
         resultEl.textContent = 'Relation added: ' + JSON.stringify(res);

@@ -7,7 +7,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | Finding | Status | Validation |
 | --- | --- | --- |
 | 1 Atomic relation import | Complete | IndexedDB regression tests: invalid input, mid-write rollback, merge, explicit empty replace. |
-| 2 Evidence verse selection | Pending | |
+| 2 Evidence verse selection | Complete | Word context overrides dropdown; mixed-verse selections rejected; evidence resolver tests. |
 | 3 Backend access control | Pending | |
 | 4 Complete word usages | Pending | |
 | 5 Relation validation and durable writes | Pending | |

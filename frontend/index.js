@@ -1,3 +1,4 @@
+import { evidenceVerse } from './evidence.js';
 // Moved from inline script in index.html
 import * as api from '/static/app.js';
 import { createOption, setOptions, escapeHtml, sampleRandom } from '/static/dom-utils.js';
@@ -286,6 +287,7 @@ async function loadVerses(chapterId, opts = { selectVerseId: null, showWholeChap
         box.dataset.allOriginals = JSON.stringify(Array.isArray(w.all_originals) ? w.all_originals : []);
         box.dataset.allTranslations = JSON.stringify(Array.isArray(w.all_translations) ? w.all_translations : []);
         box.dataset.strong = w.strong || '';
+        box.dataset.verseId = String(vb.id);
         box.appendChild(top);
         box.appendChild(bottom);
         box.classList.add('selectable', 'word-main');
@@ -357,6 +359,7 @@ async function loadWords(verseId) {
     box.dataset.allOriginals = JSON.stringify(allOriginals);
     box.dataset.allTranslations = JSON.stringify(allTranslations);
     box.dataset.strong = w.strong || '';
+    box.dataset.verseId = String(verseId);
     box.appendChild(top);
     box.appendChild(bottom);
     box.classList.add('selectable', 'word-main');
@@ -675,6 +678,13 @@ document.getElementById('addRel').addEventListener('click', async () => {
   // Determine source verse for all relations
   const selectedVerseNumber = Number(versesEl && versesEl.value ? versesEl.value : 0);
   const selectedVerse = currentVerses.find(v => Number(v.number) === selectedVerseNumber);
+    let evidenceId;
+    try {
+        evidenceId = evidenceVerse(Array.from(document.querySelectorAll('.word-box.selected')).map(el => el.dataset.verseId), selectedVerse?.id);
+        const evidence = currentVerses.find(v => v.id === evidenceId);
+        if (evidence) versesEl.value = String(evidence.number);
+    } catch (err) { resultEl.textContent = err.message; return; }
+
 
   if (type === 'composes') {
     // Compose mode: multiple members → one target
@@ -691,7 +701,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
     try {
       for (const member of members) {
         const payload = { source_id: member, target_id: target, relation_type: 'composes' };
-        if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+        payload.source_verse_id = evidenceId;
         await api.addRelation(payload);
       }
       resultEl.textContent = `Added ${members.length} "composes" relation(s) → ${target}`;
@@ -712,7 +722,7 @@ document.getElementById('addRel').addEventListener('click', async () => {
       return;
     }
     const payload = { source_id: src, target_id: tgt, relation_type: type };
-    if (selectedVerse) payload.source_verse_id = selectedVerse.id;
+    payload.source_verse_id = evidenceId;
     try {
       const res = await api.addRelation(payload);
       resultEl.textContent = 'Relation added: ' + JSON.stringify(res);
