@@ -43,6 +43,7 @@ function preprocessBible() {
     const books = [];      // { id, name }
     const chapters = [];   // { id, book_id, number }
     const verses = [];     // { id, chapter_id, number }
+    const usagesMap = {};
     const wordsMap = {};   // strong -> { strong, original: Set, translation: Set }
 
     // Per-chapter verse-word data, keyed by chapterId
@@ -109,6 +110,10 @@ function preprocessBible() {
                         seenInVerse.add(strong);
                         // Compact format: [strong, original, translation]
                         verseData.words.push([strong, original, translation]);
+                        const shard = strong.slice(0, 2);
+                        if (!usagesMap[shard]) usagesMap[shard] = {};
+                        if (!usagesMap[shard][strong]) usagesMap[shard][strong] = [];
+                        usagesMap[shard][strong].push([verseId, original, translation]);
                     }
                 }
                 chapterData.verses.push(verseData);
@@ -126,6 +131,11 @@ function preprocessBible() {
 
     // Write the small index file (books, chapters, verses metadata, words dictionary)
     ensureDir(DATA_DIR);
+    const usageDir = path.join(DATA_DIR, 'usages');
+    ensureDir(usageDir);
+    for (const [shard, usages] of Object.entries(usagesMap)) {
+        fs.writeFileSync(path.join(usageDir, encodeURIComponent(shard) + '.json'), JSON.stringify(usages));
+    }
     const index = { books, chapters, verses, words };
     const indexPath = path.join(DATA_DIR, 'bible-index.json');
     fs.writeFileSync(indexPath, JSON.stringify(index));

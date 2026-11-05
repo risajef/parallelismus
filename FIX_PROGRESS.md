@@ -9,7 +9,7 @@ Each completed entry is committed separately. The commit containing an entry is 
 | 1 Atomic relation import | Complete | IndexedDB regression tests: invalid input, mid-write rollback, merge, explicit empty replace. |
 | 2 Evidence verse selection | Complete | Word context overrides dropdown; mixed-verse selections rejected; evidence resolver tests. |
 | 3 Backend access control | Complete | Default read-only, bearer token and exact origin checks; API authorization tests. |
-| 4 Complete word usages | Pending | |
+| 4 Complete word usages | Complete | Sharded reverse index; cold detail and cache regression tests. |
 | 5 Relation validation and durable writes | Pending | |
 | 6 Transactional corpus import | Pending | |
 | 7 Current and repeatable seed | Pending | |

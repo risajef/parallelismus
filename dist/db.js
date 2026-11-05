@@ -42,6 +42,7 @@ let _verseToChapter = {};  // verse_id → chapter_id  (fast reverse lookup)
 
 // Per-chapter verse-word cache  chapter_id → { verses: [{ id, number, words: [[strong,orig,trans],...] }] }
 const _chapterCache = {};
+const _usageCache = new Map();
 
 // ── IndexedDB for relations only ────────────────────────────────────────────
 const DB_NAME = 'parallelismus';
@@ -187,29 +188,22 @@ export async function fetchWordDetail(strong) {
     const word = _wordsMap[strong];
     if (!word) throw new Error('Word not found');
 
-    // Scan cached chapters for usages (avoids fetching all 1188 chapters)
-    const usages = [];
-    for (const [cid, chData] of Object.entries(_chapterCache)) {
-        const chapter = _chapters.find(c => c.id === Number(cid));
-        if (!chapter) continue;
-        const book = _books.find(b => b.id === chapter.book_id);
-        for (const v of chData.verses) {
-            for (const w of v.words) {
-                if (w[0] === strong) {
-                    usages.push({
-                        verse_id: v.id,
-                        verse_number: v.number,
-                        chapter_id: chapter.id,
-                        chapter_number: chapter.number,
-                        book_id: book ? book.id : 0,
-                        book_name: book ? book.name : '',
-                        verse_original: w[1] || '',
-                        verse_translation: w[2] || '',
-                    });
-                }
-            }
-        }
+    const shard = encodeURIComponent(strong.slice(0, 2));
+    if (!_usageCache.has(shard)) {
+        _usageCache.set(shard, fetch(_base + 'data/usages/' + shard + '.json').then(async resp => {
+            if (!resp.ok) throw new Error('Failed to fetch word usages');
+            return resp.json();
+        }).catch(err => { _usageCache.delete(shard); throw err; }));
     }
+    const rows = (await _usageCache.get(shard))[strong] || [];
+    const usages = rows.map(([verseId, original, translation]) => {
+        const verse = _verses.find(v => v.id === verseId);
+        const chapter = _chapters.find(c => c.id === verse.chapter_id);
+        const book = _books.find(b => b.id === chapter.book_id);
+        return { verse_id: verseId, verse_number: verse.number, chapter_id: chapter.id,
+            chapter_number: chapter.number, book_id: book.id, book_name: book.name,
+            verse_original: original, verse_translation: translation };
+    });
     return {
         strong: word.strong,
         all_originals: word.original,
