@@ -15,6 +15,7 @@ export {
     fetchWordDetail,
     fetchStrongSearch,
     addRelation,
+    addRelations,
     deleteRelation,
     fetchRelations,
     fetchGroupedRelations,

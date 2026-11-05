@@ -15,7 +15,7 @@ test('invalid replacement and failed writes preserve annotations', async()=>{
 });
 test('merge is default and empty replacement is explicit',async()=>{
     const api=await freshDB();await api.addRelation(relation);
-    await api.importRelations(JSON.stringify([relation]));
+    await api.importRelations(JSON.stringify([{...relation,target_id:'c'}]));
     assert.equal(JSON.parse(await api.exportRelations()).length,2);
     await api.importRelations('[]',{mode:'replace'});
     assert.deepEqual(JSON.parse(await api.exportRelations()),[]);

@@ -259,31 +259,51 @@ function relGet(id) {
 
 // ── Relations CRUD ──────────────────────────────────────────────────────────
 
-export async function addRelation(payload) {
+function validateRelation(payload) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid relation object');
+    if (!Object.hasOwn(_wordsMap, payload.source_id) || !Object.hasOwn(_wordsMap, payload.target_id)) throw new Error('Unknown relation endpoint');
+    if (!RELATION_TYPES.includes(payload.relation_type)) throw new Error('Unknown relation type');
+    if (!Number.isSafeInteger(payload.source_verse_id) || !Object.hasOwn(_verseToChapter, payload.source_verse_id)) throw new Error('Unknown evidence verse');
+    if (payload.notes != null && (typeof payload.notes !== 'string' || payload.notes.length > 10000)) throw new Error('Invalid notes');
+    return {source_id:payload.source_id, target_id:payload.target_id, relation_type:payload.relation_type,
+        source_verse_id:payload.source_verse_id, notes:payload.notes ?? null};
+}
+function relationKey(r) { return JSON.stringify([r.source_id,r.target_id,r.relation_type,r.source_verse_id]); }
+
+export async function addRelations(payloads) {
+    const records = payloads.map(validateRelation);
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
+        tx.oncomplete = () => resolve(records);
+        tx.onabort = () => reject(tx.error || new Error('Relation write aborted'));
         const store = tx.objectStore('relations');
-        const record = {
-            source_id: payload.source_id,
-            target_id: payload.target_id,
-            relation_type: payload.relation_type,
-            source_verse_id: payload.source_verse_id || null,
-            notes: payload.notes || null,
+        store.getAll().onsuccess = ev => {
+            const keys = new Set(ev.target.result.map(relationKey));
+            try {
+                for (const rec of records) {
+                    const key = relationKey(rec);
+                    if (keys.has(key)) throw new Error('Relation already exists for this evidence verse');
+                    keys.add(key);
+                    store.add(rec).onsuccess = ev => { rec.id = ev.target.result; };
+                }
+            } catch (err) { tx.abort(); reject(err); }
         };
-        const req = store.add(record);
-        req.onsuccess = () => { record.id = req.result; resolve(record); };
-        req.onerror = () => reject(req.error);
     });
 }
+export async function addRelation(payload) { return (await addRelations([payload]))[0]; }
 
 export async function deleteRelation(relationId) {
-    const rel = await relGet(Number(relationId));
-    if (!rel) throw new Error('Relation not found');
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('relations', 'readwrite');
-        tx.objectStore('relations').delete(Number(relationId));
-        tx.oncomplete = () => resolve(rel);
-        tx.onerror = () => reject(tx.error);
+        let record;
+        tx.oncomplete = () => resolve(record);
+        tx.onabort = () => reject(tx.error || new Error('Delete aborted'));
+        const store = tx.objectStore('relations');
+        store.get(Number(relationId)).onsuccess = ev => {
+            record = ev.target.result;
+            if (!record) { tx.abort(); return; }
+            store.delete(Number(relationId));
+        };
     });
 }
 
@@ -368,15 +388,10 @@ export async function importRelations(jsonString, { mode = 'merge' } = {}) {
     if (!['merge', 'replace'].includes(mode)) throw new Error('Unknown import mode');
     const ids = new Set();
     const validated = records.map((rec) => {
-        if (!rec || typeof rec !== 'object' || Array.isArray(rec)) throw new Error('Invalid relation object');
-        if (!_wordsMap[rec.source_id] || !_wordsMap[rec.target_id]) throw new Error('Unknown relation endpoint');
-        if (!RELATION_TYPES.includes(rec.relation_type)) throw new Error('Unknown relation type');
-        if (rec.source_verse_id != null && !_verseToChapter[rec.source_verse_id]) throw new Error('Unknown evidence verse');
-        if (rec.notes != null && typeof rec.notes !== 'string') throw new Error('Invalid notes');
+        const clean = validateRelation(rec);
         if (rec.id != null && (!Number.isSafeInteger(rec.id) || rec.id < 1 || ids.has(rec.id))) throw new Error('Invalid or duplicate relation ID');
         ids.add(rec.id);
-        const record = { source_id: rec.source_id, target_id: rec.target_id, relation_type: rec.relation_type,
-            source_verse_id: rec.source_verse_id ?? null, notes: rec.notes ?? null };
+        const record = clean;
         if (mode === 'replace' && rec.id != null) record.id = rec.id;
         return record;
     });

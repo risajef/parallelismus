@@ -6,8 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlmodel import select
-from typing import List
-from pydantic import BaseModel
+from typing import List, Literal
+from pydantic import BaseModel, Field as InputField, constr
 
 from .database import create_db_and_tables, engine
 from .models import Book, Chapter, Verse, Word, Relation, VerseWord
@@ -494,15 +494,36 @@ def get_grouped_relations(word_id: str):
         return result
 
 
-@app.post("/relations", response_model=Relation)
-def add_relation(relation: Relation):
-    from sqlmodel import Session
+class RelationCreate(BaseModel):
+    source_id: constr(strip_whitespace=True, min_length=1, max_length=32)
+    target_id: constr(strip_whitespace=True, min_length=1, max_length=32)
+    relation_type: Literal['composes', 'opposite', 'similar', 'element_of', 'subset_of', 'attribute_of']
+    source_verse_id: int = InputField(gt=0)
+    notes: constr(max_length=10000) | None = None
 
+    class Config:
+        extra = 'forbid'
+
+
+@app.post('/relations', response_model=Relation)
+def add_relation(relation: RelationCreate):
+    from sqlmodel import Session
     with Session(engine) as session:
-        session.add(relation)
+        if not session.get(Word, relation.source_id) or not session.get(Word, relation.target_id):
+            raise HTTPException(422, 'Unknown relation endpoint')
+        if not session.get(Verse, relation.source_verse_id):
+            raise HTTPException(422, 'Unknown evidence verse')
+        duplicate = session.exec(select(Relation).where(
+            Relation.source_id == relation.source_id, Relation.target_id == relation.target_id,
+            Relation.relation_type == relation.relation_type,
+            Relation.source_verse_id == relation.source_verse_id)).first()
+        if duplicate:
+            raise HTTPException(409, 'Relation already exists for this evidence verse')
+        saved = Relation(**relation.dict())
+        session.add(saved)
         session.commit()
-        session.refresh(relation)
-        return relation
+        session.refresh(saved)
+        return saved
 
 
 @app.delete("/relations/{relation_id}", response_model=Relation)
